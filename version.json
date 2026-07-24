@@ -1,7 +1,17 @@
 {
-  "version": "2.0.1",
+  "version": "2.0.2",
   "downloadURL": "https://github.com/arunofhyd/JobsMonitor/releases/latest",
   "changelog": [
+    {
+      "version": "2.0.2",
+      "date": "2026-07-24",
+      "changes": [
+        "Auto-download installer from GitHub on Update Now click.",
+        "Install app to /Applications for Finder visibility.",
+        "Removed GitHub Repository button from About window.",
+        "Cleaned up Contact Developer button in About window."
+      ]
+    },
     {
       "version": "2.0.1",
       "date": "2026-07-24",
