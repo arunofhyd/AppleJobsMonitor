@@ -1057,14 +1057,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let remoteVersion = json["version"] as? String else {
-                if !silentIfCurrent {
-                    DispatchQueue.main.async {
-                        self.showUpdateAlert(remoteVersion: nil, changelog: "", isNewer: false)
-                    }
-                }
-                return
-            }
+                  let remoteVersion = json["version"] as? String else { return }
             
             var notes = ""
             if let changelogs = json["changelog"] as? [[String: Any]],
@@ -1074,8 +1067,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             
             let isNewer = self.compareVersions(remote: remoteVersion, current: APP_VERSION)
-            DispatchQueue.main.async {
-                self.showUpdateAlert(remoteVersion: remoteVersion, changelog: notes, isNewer: isNewer)
+            if isNewer {
+                DispatchQueue.main.async {
+                    self.showUpdateAlert(remoteVersion: remoteVersion, changelog: notes)
+                }
             }
         }
         task.resume()
@@ -1094,7 +1089,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
     
-    func showUpdateAlert(remoteVersion: String?, changelog: String, isNewer: Bool) {
+    func showUpdateAlert(remoteVersion: String, changelog: String) {
         let alert = NSAlert()
         alert.alertStyle = .informational
         
@@ -1103,21 +1098,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.icon = img
         }
         
-        if isNewer, let ver = remoteVersion {
-            alert.messageText = " Update Available: Jobs Monitor v\(ver)"
-            alert.informativeText = "A new version of Jobs Monitor is available!\n\nWhat's New in v\(ver):\n\(changelog)\n\nClick \"Update Now\" to download and install automatically."
-            alert.addButton(withTitle: "Update Now")
-            alert.addButton(withTitle: "Later")
-            
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                downloadAndInstallUpdate()
-            }
-        } else {
-            alert.messageText = " You're Up to Date!"
-            alert.informativeText = "Jobs Monitor v\(APP_VERSION) is currently the latest version available."
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
+        alert.messageText = " Update Available: Jobs Monitor v\(remoteVersion)"
+        alert.informativeText = "A new version of Jobs Monitor is available!\n\nWhat's New in v\(remoteVersion):\n\(changelog)\n\nClick \"Update Now\" to download and install automatically."
+        alert.addButton(withTitle: "Update Now")
+        alert.addButton(withTitle: "Later")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            downloadAndInstallUpdate()
         }
     }
     
