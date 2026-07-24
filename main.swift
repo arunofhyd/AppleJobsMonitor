@@ -1057,7 +1057,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let remoteVersion = json["version"] as? String else { return }
+                  let remoteVersion = json["version"] as? String else {
+                if !silentIfCurrent {
+                    DispatchQueue.main.async {
+                        self.showUpdateAlert(remoteVersion: nil, changelog: "", isNewer: false)
+                    }
+                }
+                return
+            }
             
             var notes = ""
             if let changelogs = json["changelog"] as? [[String: Any]],
@@ -1067,9 +1074,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             
             let isNewer = self.compareVersions(remote: remoteVersion, current: APP_VERSION)
-            if isNewer {
+            if isNewer || !silentIfCurrent {
                 DispatchQueue.main.async {
-                    self.showUpdateAlert(remoteVersion: remoteVersion, changelog: notes)
+                    self.showUpdateAlert(remoteVersion: remoteVersion, changelog: notes, isNewer: isNewer)
                 }
             }
         }
@@ -1089,7 +1096,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
     
-    func showUpdateAlert(remoteVersion: String, changelog: String) {
+    func showUpdateAlert(remoteVersion: String?, changelog: String, isNewer: Bool) {
         let alert = NSAlert()
         alert.alertStyle = .informational
         
@@ -1098,33 +1105,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.icon = img
         }
         
-        alert.messageText = " Update Available: Jobs Monitor v\(remoteVersion)"
-        alert.informativeText = "A new version of Jobs Monitor is available!\n\nWhat's New in v\(remoteVersion):\n\(changelog)\n\nClick \"Update Now\" to download and install automatically."
-        alert.addButton(withTitle: "Update Now")
-        alert.addButton(withTitle: "Later")
-        
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            downloadAndInstallUpdate()
+        if isNewer, let ver = remoteVersion {
+            alert.messageText = " Update Available: Jobs Monitor v\(ver)"
+            alert.informativeText = "A new version of Jobs Monitor is available!\n\nWhat's New in v\(ver):\n\(changelog)\n\nClick \"Update Now\" to download and install automatically."
+            alert.addButton(withTitle: "Update Now")
+            alert.addButton(withTitle: "Later")
+            
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                downloadAndInstallUpdate()
+            }
+        } else {
+            alert.messageText = " You're Up to Date!"
+            alert.informativeText = "Jobs Monitor v\(APP_VERSION) is currently the latest version available."
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
         }
     }
     
     func downloadAndInstallUpdate() {
         guard let url = URL(string: COMMAND_DOWNLOAD_URL) else { return }
         
-        let progressAlert = NSAlert()
-        progressAlert.messageText = "Downloading Update…"
-        progressAlert.informativeText = "Fetching the latest installer from GitHub. This will only take a moment."
-        progressAlert.addButton(withTitle: "Cancel")
-        
-        var cancelled = false
-        
         let task = URLSession.shared.downloadTask(with: url) { tempURL, _, error in
             DispatchQueue.main.async {
-                NSApp.abortModal()
-                
-                guard !cancelled else { return }
-                
                 if let error = error {
                     let err = NSAlert()
                     err.alertStyle = .warning
@@ -1147,7 +1150,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         [.posixPermissions: NSNumber(value: 0o755)],
                         ofItemAtPath: destURL.path
                     )
-                    // .command files auto-run when opened — launches in Terminal.app
+                    // Launch installer script directly in Terminal
                     NSWorkspace.shared.open(destURL)
                 } catch {
                     let err = NSAlert()
@@ -1160,12 +1163,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         task.resume()
-        
-        let result = progressAlert.runModal()
-        if result == .alertFirstButtonReturn {
-            cancelled = true
-            task.cancel()
-        }
     }
     
     func scheduleTimer() {
