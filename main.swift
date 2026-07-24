@@ -8,6 +8,7 @@ let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
 let LATEST_RELEASE_URL = "https://github.com/arunofhyd/JobsMonitor/releases/latest"
+let COMMAND_DOWNLOAD_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command"
 
 let appDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!.appendingPathComponent("JobsMonitor")
 let stateFile = appDir.appendingPathComponent("seen_jobs.json")
@@ -1052,11 +1053,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             let isNewer = self.compareVersions(remote: remoteVersion, current: APP_VERSION)
             DispatchQueue.main.async {
-                if isNewer {
-                    self.showUpdateAlert(remoteVersion: remoteVersion, changelog: notes, isNewer: true)
-                } else if !silentIfCurrent {
-                    self.showUpdateAlert(remoteVersion: remoteVersion, changelog: notes, isNewer: false)
-                }
+                self.showUpdateAlert(remoteVersion: remoteVersion, changelog: notes, isNewer: isNewer)
             }
         }
         task.resume()
@@ -1079,28 +1076,85 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.alertStyle = .informational
         
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Users/arunthomas/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
             alert.icon = img
         }
         
         if isNewer, let ver = remoteVersion {
             alert.messageText = " Update Available: Jobs Monitor v\(ver)"
-            alert.informativeText = "A new version of Jobs Monitor is available on GitHub!\n\nRelease Notes (v\(ver)):\n\(changelog)\n\nWould you like to open the release page to download?"
-            alert.addButton(withTitle: "Download Update ↗")
+            alert.informativeText = "A new version of Jobs Monitor is available!\n\nWhat's New in v\(ver):\n\(changelog)\n\nClick \"Update Now\" to download and install automatically."
+            alert.addButton(withTitle: "Update Now")
             alert.addButton(withTitle: "Later")
             
             let response = alert.runModal()
             if response == .alertFirstButtonReturn {
-                if let url = URL(string: LATEST_RELEASE_URL) {
-                    NSWorkspace.shared.open(url)
-                }
+                downloadAndInstallUpdate()
             }
         } else {
             alert.messageText = " You're Up to Date!"
             alert.informativeText = "Jobs Monitor v\(APP_VERSION) is currently the latest version available."
             alert.addButton(withTitle: "OK")
             alert.runModal()
+        }
+    }
+    
+    func downloadAndInstallUpdate() {
+        guard let url = URL(string: COMMAND_DOWNLOAD_URL) else { return }
+        
+        let progressAlert = NSAlert()
+        progressAlert.messageText = "Downloading Update…"
+        progressAlert.informativeText = "Fetching the latest installer from GitHub. This will only take a moment."
+        progressAlert.addButton(withTitle: "Cancel")
+        
+        var cancelled = false
+        
+        let task = URLSession.shared.downloadTask(with: url) { tempURL, _, error in
+            DispatchQueue.main.async {
+                NSApp.abortModal()
+                
+                guard !cancelled else { return }
+                
+                if let error = error {
+                    let err = NSAlert()
+                    err.alertStyle = .warning
+                    err.messageText = "Download Failed"
+                    err.informativeText = "Could not download the update:\n\(error.localizedDescription)\n\nPlease check your internet connection and try again."
+                    err.addButton(withTitle: "OK")
+                    err.runModal()
+                    return
+                }
+                
+                guard let tempURL = tempURL else { return }
+                
+                let downloadsDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+                let destURL = downloadsDir.appendingPathComponent("install-jobsmonitor.command")
+                
+                try? FileManager.default.removeItem(at: destURL)
+                do {
+                    try FileManager.default.copyItem(at: tempURL, to: destURL)
+                    try FileManager.default.setAttributes(
+                        [.posixPermissions: NSNumber(value: 0o755)],
+                        ofItemAtPath: destURL.path
+                    )
+                    // .command files auto-run when opened — launches in Terminal.app
+                    NSWorkspace.shared.open(destURL)
+                } catch {
+                    let err = NSAlert()
+                    err.alertStyle = .warning
+                    err.messageText = "Could Not Save Installer"
+                    err.informativeText = "The installer was downloaded but couldn't be saved:\n\(error.localizedDescription)"
+                    err.addButton(withTitle: "OK")
+                    err.runModal()
+                }
+            }
+        }
+        task.resume()
+        
+        let result = progressAlert.runModal()
+        if result == .alertFirstButtonReturn {
+            cancelled = true
+            task.cancel()
         }
     }
     
