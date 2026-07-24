@@ -205,12 +205,13 @@ cat << EOF > "$PLIST_PATH"
 </plist>
 EOF
 
+# Reset first-launch flag so Preferences opens automatically after install
+defaults delete "$PLIST_LABEL" has_launched_jobsmonitor 2>/dev/null || true
+pkill -9 -x "$APP_NAME" 2>/dev/null || true
 launchctl unload "$PLIST_PATH" 2>/dev/null
 launchctl load "$PLIST_PATH" 2>/dev/null
 touch "$TARGET_APP"
-# Reset first-launch flag so Preferences opens automatically after install
-defaults delete "$PLIST_LABEL" has_launched_jobsmonitor 2>/dev/null || true
-open "$TARGET_APP"
+open "$TARGET_APP" --args --open-preferences
 ok "Jobs Monitor installed & running."
 printf "\\n"
 

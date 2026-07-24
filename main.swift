@@ -914,8 +914,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindowController: SettingsWindowController?
     var aboutWindowController: AboutWindowController?
     
+    func setupMainMenu() {
+        let mainMenu = NSMenu()
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        
+        editMenu.addItem(withTitle: "Undo", action: #selector(UndoManager.undo), keyEquivalent: "z")
+        let redoItem = NSMenuItem(title: "Redo", action: #selector(UndoManager.redo), keyEquivalent: "Z")
+        editMenu.addItem(redoItem)
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+        NSApp.mainMenu = mainMenu
+    }
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         logMessage(" Jobs Monitor App Starting...")
+        
+        setupMainMenu()
         
         let settings = loadSettings()
         configureLaunchAtLogin(enabled: settings.launchAtLogin)
@@ -933,11 +954,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         performCheck(isManual: false)
         checkForUpdates(silentIfCurrent: true)
         
-        // First Launch: Automatically open Preferences Window
+        // First Launch or Installer Launch: Automatically open Preferences Window
         let firstLaunchKey = "has_launched_jobsmonitor"
-        if !UserDefaults.standard.bool(forKey: firstLaunchKey) {
+        let forceOpenPref = CommandLine.arguments.contains("--open-preferences")
+        if forceOpenPref || !UserDefaults.standard.bool(forKey: firstLaunchKey) {
             UserDefaults.standard.set(true, forKey: firstLaunchKey)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.openPreferences()
             }
         }
