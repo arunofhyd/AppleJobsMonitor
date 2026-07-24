@@ -14,12 +14,12 @@ if not os.path.exists(main_swift_path):
 if not os.path.exists(jobs_png_path):
     jobs_png_path = "logo-jobsmonitor.png"
 
-app_version = "2.0.0"
+app_version = "2.0.1"
 if os.path.exists(version_json_path):
     try:
         with open(version_json_path, "r", encoding="utf-8") as f:
             vdata = json.load(f)
-            app_version = vdata.get("version", "2.0.0")
+            app_version = vdata.get("version", "2.0.1")
     except Exception:
         pass
 
@@ -108,8 +108,15 @@ printf "\\n"
 
 # ---- Step 4: Building app bundle & app icon -------------------------------
 step "Building app bundle & app icon…"
-TARGET_APP="$HOME/Applications/$APP_NAME.app"
-pkill -x "$APP_NAME" 2>/dev/null
+if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+    BUILD_DIR_LOCAL="$SCRIPT_DIR/Build"
+    mkdir -p "$BUILD_DIR_LOCAL"
+    TARGET_APP="$BUILD_DIR_LOCAL/$APP_NAME.app"
+else
+    TARGET_APP="$HOME/Applications/$APP_NAME.app"
+    pkill -x "$APP_NAME" 2>/dev/null
+fi
 rm -rf "$TARGET_APP"
 
 CONTENTS_DIR="$TARGET_APP/Contents"
@@ -165,6 +172,14 @@ EOF
 ok "App bundle created."
 printf "\\n"
 
+if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
+    line
+    printf "${{WHITE}}${{BOLD}}   ✓ CI Build Complete: $TARGET_APP${{NC}}\\n"
+    line
+    printf "\\n"
+    exit 0
+fi
+
 # ---- Step 5: Installing background agent & launching --------------------
 step "Installing background agent & launching app…"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
@@ -208,4 +223,4 @@ with open(out_command, "w", encoding="utf-8") as f:
     f.write(command_content)
 
 os.chmod(out_command, 0o755)
-print("Generated install-jobsmonitor.command with perfectly aligned divider lines!")
+print("Generated install-jobsmonitor.command with CI Build support!")

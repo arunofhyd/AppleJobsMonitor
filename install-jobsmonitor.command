@@ -73,8 +73,15 @@ printf "\n"
 
 # ---- Step 4: Building app bundle & app icon -------------------------------
 step "Building app bundle & app icon…"
-TARGET_APP="$HOME/Applications/$APP_NAME.app"
-pkill -x "$APP_NAME" 2>/dev/null
+if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    BUILD_DIR_LOCAL="$SCRIPT_DIR/Build"
+    mkdir -p "$BUILD_DIR_LOCAL"
+    TARGET_APP="$BUILD_DIR_LOCAL/$APP_NAME.app"
+else
+    TARGET_APP="$HOME/Applications/$APP_NAME.app"
+    pkill -x "$APP_NAME" 2>/dev/null
+fi
 rm -rf "$TARGET_APP"
 
 CONTENTS_DIR="$TARGET_APP/Contents"
@@ -129,6 +136,14 @@ cat << EOF > "$CONTENTS_DIR/Info.plist"
 EOF
 ok "App bundle created."
 printf "\n"
+
+if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
+    line
+    printf "${WHITE}${BOLD}   ✓ CI Build Complete: $TARGET_APP${NC}\n"
+    line
+    printf "\n"
+    exit 0
+fi
 
 # ---- Step 5: Installing background agent & launching --------------------
 step "Installing background agent & launching app…"
