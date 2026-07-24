@@ -1,16 +1,27 @@
 import os
 import sys
 import base64
+import json
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 main_swift_path = os.path.join(script_dir, "main.swift")
 jobs_png_path = os.path.join(script_dir, "logo-jobsmonitor.png")
+version_json_path = os.path.join(script_dir, "version.json")
 
 if not os.path.exists(main_swift_path):
     main_swift_path = "main.swift"
 
 if not os.path.exists(jobs_png_path):
     jobs_png_path = "logo-jobsmonitor.png"
+
+app_version = "2.0.0"
+if os.path.exists(version_json_path):
+    try:
+        with open(version_json_path, "r", encoding="utf-8") as f:
+            vdata = json.load(f)
+            app_version = vdata.get("version", "2.0.0")
+    except Exception:
+        pass
 
 with open(main_swift_path, "r", encoding="utf-8") as f:
     swift_code = f.read()
@@ -22,90 +33,122 @@ if os.path.exists(jobs_png_path):
     with open(jobs_png_path, "rb") as f:
         jobs_png_b64 = base64.b64encode(f.read()).decode("utf-8")
 
-command_content = f"""#!/usr/bin/env python3
-import os
-import sys
-import subprocess
-import base64
-import shutil
-from pathlib import Path
+command_content = f"""#!/bin/bash
+# =============================================================================
+#  Jobs Monitor — Builder & Installer
+#  Built by Arun Thomas · https://github.com/arunofhyd/JobsMonitor
+#
+#  This builds Jobs Monitor LOCALLY on your Mac and installs it to your
+#  Applications folder. Because it's built on your own machine, macOS trusts
+#  it natively — zero telemetry, zero "unidentified developer" warnings.
+# =============================================================================
 
-VERSION = "v2.0.0"
-CONTACT_EMAIL = "arunthomashyd@gmail.com"
-APP_NAME = "JobsMonitor"
-PLIST_LABEL = "com.aoh.jobsmonitor"
+APP_NAME="JobsMonitor"
+PLIST_LABEL="com.aoh.jobsmonitor"
 
-SWIFT_B64 = \"\"\"{swift_b64}\"\"\"
-JOBS_PNG_B64 = \"\"\"{jobs_png_b64}\"\"\"
+SWIFT_B64="{swift_b64}"
+JOBS_PNG_B64="{jobs_png_b64}"
 
-IS_CI = os.environ.get("CI") == "true" or "--ci" in sys.argv
+# ---- Apple Monochrome (White & Black) terminal styling -------------------
+BOLD='\\033[1m'; DIM='\\033[2m'; NC='\\033[0m'
+WHITE='\\033[38;5;255m'; GREY='\\033[38;5;245m'; DARK_GREY='\\033[38;5;239m'
+YELLOW='\\033[38;5;220m'; RED='\\033[38;5;196m'
 
-def build_app_ci():
-    script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-    build_dir = script_dir / "Build"
-    target_app = build_dir / f"{{APP_NAME}}.app"
-    
-    if build_dir.exists():
-        shutil.rmtree(build_dir)
-    build_dir.mkdir(parents=True, exist_ok=True)
-    
-    main_swift = build_dir / "main.swift"
-    with open(main_swift, "w", encoding="utf-8") as f:
-        f.write(base64.b64decode(SWIFT_B64).decode("utf-8"))
-        
-    exec_path = build_dir / APP_NAME
-    res = subprocess.run([
-        "swiftc", "-O", str(main_swift),
-        "-o", str(exec_path),
-        "-framework", "AppKit",
-        "-framework", "ServiceManagement"
-    ], capture_output=True, text=True)
-    
-    if res.returncode != 0:
-        print(f"Compilation failed: {{res.stderr}}")
-        sys.exit(1)
-        
-    contents_dir = target_app / "Contents"
-    macos_dir = contents_dir / "MacOS"
-    resources_dir = contents_dir / "Resources"
-    
-    macos_dir.mkdir(parents=True, exist_ok=True)
-    resources_dir.mkdir(parents=True, exist_ok=True)
-    
-    shutil.copy2(exec_path, macos_dir / APP_NAME)
-    os.chmod(macos_dir / APP_NAME, 0o755)
-    
-    png_source = build_dir / "logo-jobsmonitor.png"
-    if JOBS_PNG_B64:
-        with open(png_source, "wb") as f:
-            f.write(base64.b64decode(JOBS_PNG_B64))
-            
-    if png_source.exists():
-        iconset = build_dir / "AppIcon.iconset"
-        iconset.mkdir(exist_ok=True)
-        sizes = [
-            (16, "icon_16x16.png"), (32, "icon_16x16@2x.png"),
-            (32, "icon_32x32.png"), (64, "icon_32x32@2x.png"),
-            (128, "icon_128x128.png"), (256, "icon_128x128@2x.png"),
-            (256, "icon_256x256.png"), (512, "icon_256x256@2x.png"),
-            (512, "icon_512x512.png"), (1024, "icon_512x512@2x.png")
-        ]
-        for sz, filename in sizes:
-            subprocess.run(["sips", "-s", "format", "png", "-z", str(sz), str(sz), str(png_source), "--out", str(iconset / filename)], capture_output=True)
-            
-        icns_out = resources_dir / "AppIcon.icns"
-        subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(icns_out)], capture_output=True)
-        shutil.copy2(png_source, resources_dir / "AppIcon.png")
-        
-    info_plist = contents_dir / "Info.plist"
-    info_plist_content = f\"\"\"<?xml version="1.0" encoding="UTF-8"?>
+line() {{ printf "${{DARK_GREY}}────────────────────────────────────────────────────────────────────────────${{NC}}\\n"; }}
+step() {{ printf "${{WHITE}}${{BOLD}}▸${{NC}} ${{BOLD}}%s${{NC}}\\n" "$1"; }}
+ok()   {{ printf "  ${{WHITE}}${{BOLD}}✓${{NC}} %s\\n" "$1"; }}
+warn() {{ printf "  ${{YELLOW}}!${{NC}} %s\\n" "$1"; }}
+fail() {{ printf "  ${{RED}}✗ %s${{NC}}\\n" "$1"; }}
+
+clear
+printf "\\n"
+printf "${{WHITE}}${{BOLD}}    Jobs Monitor${{NC}}\\n"
+printf "${{GREY}}   Native macOS Menu Bar App for Apple Job Openings${{NC}}\\n"
+printf "${{GREY}}   Built by Arun Thomas${{NC}}\\n\\n"
+line
+printf "\\n"
+
+# ---- Step 1: Command Line Tools (compiler) -------------------------------
+step "Checking for build tools…"
+if ! command -v swiftc &> /dev/null; then
+    warn "Apple's Command Line Tools are needed to build the app."
+    printf "  ${{GREY}}A small official Apple installer will pop up. Please click ${{BOLD}}Install${{NC}}${{GREY}} and wait for it to finish.${{NC}}\\n\\n"
+    xcode-select --install >/dev/null 2>&1
+    printf "  ${{YELLOW}}When the installation is COMPLETE, press [Enter] here to continue…${{NC}}"
+    read -r
+    if ! command -v swiftc &> /dev/null; then
+        fail "Build tools still not found."
+        printf "  ${{GREY}}Please finish the Apple installer, then run this file again.${{NC}}\\n\\n"
+        exit 1
+    fi
+fi
+ok "Build tools ready."
+printf "\\n"
+
+# ---- Step 2: Workspace ----------------------------------------------------
+step "Preparing a clean workspace…"
+BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "$BUILD_DIR"' EXIT
+echo "$SWIFT_B64" | base64 -d > "$BUILD_DIR/main.swift"
+if [ -n "$JOBS_PNG_B64" ]; then
+    echo "$JOBS_PNG_B64" | base64 -d > "$BUILD_DIR/logo-jobsmonitor.png"
+fi
+ok "Workspace ready."
+printf "\\n"
+
+# ---- Step 3: Compiling the app -------------------------------------------
+step "Compiling Jobs Monitor…"
+if ! swiftc -O "$BUILD_DIR/main.swift" -o "$BUILD_DIR/$APP_NAME" -framework AppKit -framework ServiceManagement 2>/dev/null; then
+    fail "Could not compile the application."
+    printf "  ${{GREY}}Please check your system environment and try again.${{NC}}\\n\\n"
+    exit 1
+fi
+ok "App compiled successfully."
+printf "\\n"
+
+# ---- Step 4: Building app bundle & app icon -------------------------------
+step "Building app bundle & app icon…"
+TARGET_APP="$HOME/Applications/$APP_NAME.app"
+pkill -x "$APP_NAME" 2>/dev/null
+rm -rf "$TARGET_APP"
+
+CONTENTS_DIR="$TARGET_APP/Contents"
+MACOS_DIR="$CONTENTS_DIR/MacOS"
+RESOURCES_DIR="$CONTENTS_DIR/Resources"
+
+mkdir -p "$MACOS_DIR"
+mkdir -p "$RESOURCES_DIR"
+
+cp "$BUILD_DIR/$APP_NAME" "$MACOS_DIR/$APP_NAME"
+chmod 755 "$MACOS_DIR/$APP_NAME"
+
+PNG_SOURCE="$BUILD_DIR/logo-jobsmonitor.png"
+if [ -f "$PNG_SOURCE" ]; then
+    ICONSET="$BUILD_DIR/AppIcon.iconset"
+    mkdir -p "$ICONSET"
+    sips -s format png -z 16 16 "$PNG_SOURCE" --out "$ICONSET/icon_16x16.png" &>/dev/null
+    sips -s format png -z 32 32 "$PNG_SOURCE" --out "$ICONSET/icon_16x16@2x.png" &>/dev/null
+    sips -s format png -z 32 32 "$PNG_SOURCE" --out "$ICONSET/icon_32x32.png" &>/dev/null
+    sips -s format png -z 64 64 "$PNG_SOURCE" --out "$ICONSET/icon_32x32@2x.png" &>/dev/null
+    sips -s format png -z 128 128 "$PNG_SOURCE" --out "$ICONSET/icon_128x128.png" &>/dev/null
+    sips -s format png -z 256 256 "$PNG_SOURCE" --out "$ICONSET/icon_128x128@2x.png" &>/dev/null
+    sips -s format png -z 256 256 "$PNG_SOURCE" --out "$ICONSET/icon_256x256.png" &>/dev/null
+    sips -s format png -z 512 512 "$PNG_SOURCE" --out "$ICONSET/icon_512x512.png" &>/dev/null
+    sips -s format png -z 512 512 "$PNG_SOURCE" --out "$ICONSET/icon_512x512@2x.png" &>/dev/null
+    sips -s format png -z 1024 1024 "$PNG_SOURCE" --out "$ICONSET/icon_512x512@2x.png" &>/dev/null
+    iconutil -c icns "$ICONSET" -o "$RESOURCES_DIR/AppIcon.icns" &>/dev/null
+    cp "$PNG_SOURCE" "$RESOURCES_DIR/AppIcon.png"
+fi
+
+cat << EOF > "$CONTENTS_DIR/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>{{APP_NAME}}</string>
+    <string>$APP_NAME</string>
     <key>CFBundleIdentifier</key>
-    <string>{{PLIST_LABEL}}</string>
+    <string>$PLIST_LABEL</string>
     <key>CFBundleName</key>
     <string>Jobs Monitor</string>
     <key>CFBundleIconFile</key>
@@ -113,96 +156,51 @@ def build_app_ci():
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.0.0</string>
+    <string>{app_version}</string>
     <key>LSUIElement</key>
     <true/>
 </dict>
-</plist>\"\"\"
-    with open(info_plist, "w", encoding="utf-8") as f:
-        f.write(info_plist_content)
-        
-    print(f"CI Build Complete: {{target_app}}")
+</plist>
+EOF
+ok "App bundle created."
+printf "\\n"
 
-def main_interactive():
-    C_APP = "\\033[1;36m"
-    C_OK  = "\\033[1;32m"
-    C_ERR = "\\033[1;31m"
-    C_INF = "\\033[1;34m"
-    C_DIM = "\\033[2m"
-    C_RST = "\\033[0m"
+# ---- Step 5: Installing background agent & launching --------------------
+step "Installing background agent & launching app…"
+LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+mkdir -p "$LAUNCH_AGENTS_DIR"
+PLIST_PATH="$LAUNCH_AGENTS_DIR/$PLIST_LABEL.plist"
 
-    print("\\033[2J\\033[H", end="")
-    print(f"\\n    {{C_APP}}  Jobs Monitor{{C_RST}}  {{C_DIM}}{{VERSION}}{{C_RST}}")
-    print(f"    {{C_DIM}}Built by Arun Thomas ({{CONTACT_EMAIL}}){{C_RST}}\\n")
-    print(f"    {{C_DIM}}Native macOS Menu Bar App for Apple Job Postings.{{C_RST}}")
-    print(f"   {{C_DIM}}──────────────────────────────────────────────────────────{{C_RST}}\\n")
-
-    print(f"    {{C_INF}}●{{C_RST}} {{C_APP}}Select an option:{{C_RST}}\\n")
-    print(f"       1)  Install / Compile Jobs Monitor (Complete Setup)")
-    print(f"       2)  Uninstall Jobs Monitor")
-    
-    choice = input(f"\\n    {{C_APP}}►  Enter choice (1 or 2) [1]: {{C_RST}}").strip()
-    print()
-    
-    if choice == "2":
-        print(f"    {{C_INF}}●{{C_RST}} Uninstalling Jobs Monitor...")
-        home = Path.home()
-        target_app = home / "Applications/JobsMonitor.app"
-        plist_path = home / f"Library/LaunchAgents/{{PLIST_LABEL}}.plist"
-        subprocess.run(["pkill", "-f", "JobsMonitor"], capture_output=True)
-        if plist_path.exists():
-            subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True)
-            try: os.remove(plist_path)
-            except OSError: pass
-        if target_app.exists():
-            shutil.rmtree(target_app, ignore_errors=True)
-        print(f"    {{C_OK}}✔{{C_RST}} Uninstalled successfully.")
-    else:
-        build_app_ci()
-        home = Path.home()
-        target_app = home / "Applications/JobsMonitor.app"
-        build_app = Path(os.path.dirname(os.path.abspath(__file__))) / "Build/JobsMonitor.app"
-        
-        subprocess.run(["pkill", "-f", "JobsMonitor"], capture_output=True)
-        if target_app.exists():
-            shutil.rmtree(target_app, ignore_errors=True)
-            
-        shutil.copytree(build_app, target_app)
-        os.chmod(target_app / "Contents/MacOS/JobsMonitor", 0o755)
-        
-        launch_agent_dir = home / "Library/LaunchAgents"
-        launch_agent_dir.mkdir(parents=True, exist_ok=True)
-        plist_path = launch_agent_dir / f"{{PLIST_LABEL}}.plist"
-        plist_content = f\"\"\"<?xml version="1.0" encoding="UTF-8"?>
+cat << EOF > "$PLIST_PATH"
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>{{PLIST_LABEL}}</string>
+    <string>$PLIST_LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>{{target_app}}/Contents/MacOS/JobsMonitor</string>
+        <string>$TARGET_APP/Contents/MacOS/$APP_NAME</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <false/>
 </dict>
-</plist>\"\"\"
-        with open(plist_path, "w", encoding="utf-8") as f:
-            f.write(plist_content)
-            
-        subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True)
-        subprocess.run(["launchctl", "load", str(plist_path)], capture_output=True)
-        subprocess.run(["touch", str(target_app)], capture_output=True)
-        subprocess.run(["open", str(target_app)], capture_output=True)
-        print(f"    {{C_OK}}✔{{C_RST}} Installation Complete!")
+</plist>
+EOF
 
-if __name__ == "__main__":
-    if IS_CI:
-        build_app_ci()
-    else:
-        main_interactive()
+launchctl unload "$PLIST_PATH" 2>/dev/null
+launchctl load "$PLIST_PATH" 2>/dev/null
+touch "$TARGET_APP"
+open "$TARGET_APP"
+ok "Jobs Monitor installed & running."
+printf "\\n"
+
+line
+printf "${{WHITE}}${{BOLD}}   ✓ Jobs Monitor is now installed and running in your menu bar.${{NC}}\\n"
+line
+printf "\\n"
 """
 
 out_command = os.path.join(script_dir, "install-jobsmonitor.command")
@@ -210,4 +208,4 @@ with open(out_command, "w", encoding="utf-8") as f:
     f.write(command_content)
 
 os.chmod(out_command, 0o755)
-print("Generated generate_installer.py for Jobs Monitor successfully!")
+print("Generated install-jobsmonitor.command with perfectly aligned divider lines!")

@@ -1,7 +1,19 @@
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "downloadURL": "https://github.com/arunofhyd/JobsMonitor/releases/latest",
   "changelog": [
+    {
+      "version": "2.0.1",
+      "date": "2026-07-24",
+      "changes": [
+        "Converted installer to native Bash script without Python dependency.",
+        "Added kernel-level single instance flock lock to prevent duplicate menu bar icons.",
+        "Added automatic Preferences window pop-up on first launch.",
+        "Redesigned Preferences window with 600px card UI and clean city preset titles.",
+        "Expanded live-validated search presets to 30 countries and 29 tech hub cities.",
+        "Applied Apple Monochrome terminal installer theme with step-by-step ClipLocal styling."
+      ]
+    },
     {
       "version": "2.0.0",
       "date": "2026-07-24",

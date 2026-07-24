@@ -3,7 +3,7 @@ import Foundation
 import ServiceManagement
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.0.0"
+let APP_VERSION = "2.0.1"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -41,34 +41,49 @@ let countryPresets: [LocationPreset] = [
     LocationPreset(name: "South Korea", code: "south-korea-KOR"),
     LocationPreset(name: "Taiwan", code: "taiwan-TWN"),
     LocationPreset(name: "United Arab Emirates", code: "united-arab-emirates-ARE"),
-    LocationPreset(name: "Brazil", code: "brazil-BRA")
+    LocationPreset(name: "Brazil", code: "brazil-BRA"),
+    LocationPreset(name: "Mexico", code: "mexico-MEX"),
+    LocationPreset(name: "Israel", code: "israel-ISR"),
+    LocationPreset(name: "Poland", code: "poland-POL"),
+    LocationPreset(name: "Austria", code: "austria-AUT"),
+    LocationPreset(name: "Belgium", code: "belgium-BEL"),
+    LocationPreset(name: "Denmark", code: "denmark-DNK"),
+    LocationPreset(name: "New Zealand", code: "new-zealand-NZL"),
+    LocationPreset(name: "Vietnam", code: "vietnam-VNM"),
+    LocationPreset(name: "Thailand", code: "thailand-THA"),
+    LocationPreset(name: "Malaysia", code: "malaysia-MYS")
 ]
 
 let cityPresets: [LocationPreset] = [
-    LocationPreset(name: "Hyderabad (India)", code: "hyderabad-HY1"),
-    LocationPreset(name: "Bengaluru (India)", code: "bengaluru-BEN"),
-    LocationPreset(name: "Chennai (India)", code: "chennai-CHE"),
-    LocationPreset(name: "Gurugram (India)", code: "gurugram-GUR"),
-    LocationPreset(name: "Mumbai (India)", code: "mumbai-MUM"),
-    LocationPreset(name: "Cupertino (USA)", code: "cupertino-CUP"),
-    LocationPreset(name: "Austin (USA)", code: "austin-AUS"),
-    LocationPreset(name: "San Francisco (USA)", code: "san-francisco-SFO"),
-    LocationPreset(name: "Seattle (USA)", code: "seattle-SEA"),
-    LocationPreset(name: "San Diego (USA)", code: "san-diego-SAN"),
-    LocationPreset(name: "New York (USA)", code: "new-york-NYC"),
-    LocationPreset(name: "Boston (USA)", code: "boston-BOS"),
-    LocationPreset(name: "London (UK)", code: "london-LON"),
-    LocationPreset(name: "Cambridge (UK)", code: "cambridge-CAM"),
-    LocationPreset(name: "Vancouver (Canada)", code: "vancouver-VAN"),
-    LocationPreset(name: "Toronto (Canada)", code: "toronto-TOR"),
-    LocationPreset(name: "Munich (Germany)", code: "munich-MUC"),
-    LocationPreset(name: "Berlin (Germany)", code: "berlin-BER"),
-    LocationPreset(name: "Paris (France)", code: "paris-PAR"),
-    LocationPreset(name: "Zurich (Switzerland)", code: "zurich-ZUR"),
-    LocationPreset(name: "Cork (Ireland)", code: "cork-COR"),
-    LocationPreset(name: "Tokyo (Japan)", code: "tokyo-TYO"),
-    LocationPreset(name: "Singapore (Singapore)", code: "singapore-SGP"),
-    LocationPreset(name: "Sydney (Australia)", code: "sydney-SYD")
+    LocationPreset(name: "Hyderabad", code: "hyderabad-HY1"),
+    LocationPreset(name: "Bengaluru", code: "bengaluru-BEN"),
+    LocationPreset(name: "Chennai", code: "chennai-CHE"),
+    LocationPreset(name: "Gurugram", code: "gurugram-GUR"),
+    LocationPreset(name: "Mumbai", code: "mumbai-MUM"),
+    LocationPreset(name: "Cupertino", code: "cupertino-CUP"),
+    LocationPreset(name: "Austin", code: "austin-AUS"),
+    LocationPreset(name: "San Francisco", code: "san-francisco-SFO"),
+    LocationPreset(name: "Seattle", code: "seattle-SEA"),
+    LocationPreset(name: "San Diego", code: "san-diego-SAN"),
+    LocationPreset(name: "New York", code: "new-york-NYC"),
+    LocationPreset(name: "Boston", code: "boston-BOS"),
+    LocationPreset(name: "Los Angeles", code: "los-angeles-LAX"),
+    LocationPreset(name: "Chicago", code: "chicago-CHI"),
+    LocationPreset(name: "London", code: "london-LON"),
+    LocationPreset(name: "Cambridge", code: "cambridge-CAM"),
+    LocationPreset(name: "Vancouver", code: "vancouver-VAN"),
+    LocationPreset(name: "Toronto", code: "toronto-TOR"),
+    LocationPreset(name: "Munich", code: "munich-MUC"),
+    LocationPreset(name: "Berlin", code: "berlin-BER"),
+    LocationPreset(name: "Paris", code: "paris-PAR"),
+    LocationPreset(name: "Zurich", code: "zurich-ZUR"),
+    LocationPreset(name: "Cork", code: "cork-COR"),
+    LocationPreset(name: "Tokyo", code: "tokyo-TYO"),
+    LocationPreset(name: "Singapore", code: "singapore-SGP"),
+    LocationPreset(name: "Sydney", code: "sydney-SYD"),
+    LocationPreset(name: "Melbourne", code: "melbourne-MEL"),
+    LocationPreset(name: "Seoul", code: "seoul-SEL"),
+    LocationPreset(name: "Taipei", code: "taipei-TPE")
 ]
 
 let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -578,12 +593,15 @@ class SettingsWindowController: NSWindowController {
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 540, height: 490),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 630),
+            styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.title = " Jobs Monitor Preferences"
+        window.title = "Jobs Monitor Preferences"
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
         window.center()
         self.init(window: window)
         
@@ -593,133 +611,172 @@ class SettingsWindowController: NSWindowController {
     
     func setupUI() {
         guard let contentView = window?.contentView else { return }
+        contentView.wantsLayer = true
+        contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         
-        // Header
-        let headerLabel = NSTextField(labelWithString: " Jobs Monitor Preferences")
-        headerLabel.font = NSFont.boldSystemFont(ofSize: 15)
-        headerLabel.frame = NSRect(x: 24, y: 445, width: 490, height: 22)
-        contentView.addSubview(headerLabel)
+        // ── Top Header Banner (Centralized Logo Only) ─────────────────
+        let headerView = NSView(frame: NSRect(x: 0, y: 540, width: 600, height: 90))
+        headerView.wantsLayer = true
+        headerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         
-        // Location Selection Label
-        let locLabel = NSTextField(labelWithString: "Target Search Location:")
-        locLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        locLabel.frame = NSRect(x: 24, y: 410, width: 490, height: 20)
-        contentView.addSubview(locLabel)
+        let iconView = NSImageView(frame: NSRect(x: 268, y: 13, width: 64, height: 64))
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Users/arunthomas/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        if let img = NSImage(contentsOfFile: iconPath) {
+            iconView.image = img
+        } else {
+            iconView.image = NSImage(systemSymbolName: "briefcase.fill", accessibilityDescription: nil)
+        }
+        headerView.addSubview(iconView)
         
-        // Radio 1: Country
-        radioCountry = NSButton(radioButtonWithTitle: "Country:", target: self, action: #selector(radioChanged))
-        radioCountry.frame = NSRect(x: 40, y: 380, width: 140, height: 22)
+        let headerSep = NSBox(frame: NSRect(x: 0, y: 0, width: 600, height: 1))
+        headerSep.boxType = .separator
+        headerView.addSubview(headerSep)
+        
+        contentView.addSubview(headerView)
+        
+        // ── Card 1: Target Location (y: 355, height: 170) ────────────
+        let card1 = createCardView(frame: NSRect(x: 24, y: 355, width: 552, height: 170))
+        
+        let card1Title = createSectionHeader(title: "Target Search Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 135, width: 520, height: 22))
+        card1.addSubview(card1Title)
+        
+        radioCountry = NSButton(radioButtonWithTitle: "Country Preset:", target: self, action: #selector(radioChanged))
+        radioCountry.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        radioCountry.frame = NSRect(x: 20, y: 100, width: 140, height: 22)
         radioCountry.tag = 0
-        contentView.addSubview(radioCountry)
+        card1.addSubview(radioCountry)
         
-        countryPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 377, width: 315, height: 25))
+        countryPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 97, width: 365, height: 26))
         countryPopUp.addItems(withTitles: countryPresets.map { $0.name })
-        contentView.addSubview(countryPopUp)
+        card1.addSubview(countryPopUp)
         
-        // Radio 2: City
-        radioCity = NSButton(radioButtonWithTitle: "City:", target: self, action: #selector(radioChanged))
-        radioCity.frame = NSRect(x: 40, y: 345, width: 140, height: 22)
+        radioCity = NSButton(radioButtonWithTitle: "City Preset:", target: self, action: #selector(radioChanged))
+        radioCity.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        radioCity.frame = NSRect(x: 20, y: 65, width: 140, height: 22)
         radioCity.tag = 1
-        contentView.addSubview(radioCity)
+        card1.addSubview(radioCity)
         
-        cityPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 342, width: 315, height: 25))
+        cityPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 62, width: 365, height: 26))
         cityPopUp.addItems(withTitles: cityPresets.map { $0.name })
-        contentView.addSubview(cityPopUp)
+        card1.addSubview(cityPopUp)
         
-        // Radio 3: Custom Search URL
         radioCustom = NSButton(radioButtonWithTitle: "Custom URL:", target: self, action: #selector(radioChanged))
-        radioCustom.frame = NSRect(x: 40, y: 310, width: 140, height: 22)
+        radioCustom.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        radioCustom.frame = NSRect(x: 20, y: 30, width: 140, height: 22)
         radioCustom.tag = 2
-        contentView.addSubview(radioCustom)
+        card1.addSubview(radioCustom)
         
-        customUrlField = NSTextField(frame: NSRect(x: 185, y: 308, width: 315, height: 22))
+        customUrlField = NSTextField(frame: NSRect(x: 165, y: 28, width: 365, height: 24))
         customUrlField.placeholderString = "https://jobs.apple.com/en-us/search?..."
-        contentView.addSubview(customUrlField)
+        card1.addSubview(customUrlField)
         
-        // Interval Option
+        contentView.addSubview(card1)
+        
+        // ── Card 2: Frequency & Alerts (y: 230, height: 110) ─────────
+        let card2 = createCardView(frame: NSRect(x: 24, y: 230, width: 552, height: 110))
+        
+        let card2Title = createSectionHeader(title: "Frequency & Notifications", iconName: "clock.fill", frame: NSRect(x: 16, y: 75, width: 520, height: 22))
+        card2.addSubview(card2Title)
+        
         let intervalLabel = NSTextField(labelWithString: "Background Check Interval:")
-        intervalLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        intervalLabel.frame = NSRect(x: 24, y: 265, width: 220, height: 20)
-        contentView.addSubview(intervalLabel)
+        intervalLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        intervalLabel.frame = NSRect(x: 20, y: 44, width: 220, height: 20)
+        card2.addSubview(intervalLabel)
         
-        intervalPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 262, width: 255, height: 25))
-        intervalPopUp.addItems(withTitles: [
-            "5 Minutes",
-            "15 Minutes",
-            "30 Minutes",
-            "1 Hour",
-            "2 Hours",
-            "4 Hours",
-            "6 Hours"
-        ])
-        contentView.addSubview(intervalPopUp)
+        intervalPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 41, width: 285, height: 26))
+        intervalPopUp.addItems(withTitles: ["5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "6 Hours"])
+        card2.addSubview(intervalPopUp)
         
-        // Dismiss Option
         let dismissLabel = NSTextField(labelWithString: "Alert Box Auto-Dismiss:")
-        dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        dismissLabel.frame = NSRect(x: 24, y: 225, width: 220, height: 20)
-        contentView.addSubview(dismissLabel)
+        dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        dismissLabel.frame = NSRect(x: 20, y: 12, width: 220, height: 20)
+        card2.addSubview(dismissLabel)
         
-        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 222, width: 255, height: 25))
-        dismissPopUp.addItems(withTitles: [
-            "10 Seconds",
-            "30 Seconds",
-            "1 Minute",
-            "3 Minutes",
-            "5 Minutes",
-            "10 Minutes",
-            "Do Not Auto-Dismiss"
-        ])
-        contentView.addSubview(dismissPopUp)
+        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 9, width: 285, height: 26))
+        dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
+        card2.addSubview(dismissPopUp)
         
-        // Daily Check Schedule Section Header
-        let dailyLabel = NSTextField(labelWithString: "Daily Digest Schedule:")
-        dailyLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        dailyLabel.frame = NSRect(x: 24, y: 185, width: 220, height: 20)
-        contentView.addSubview(dailyLabel)
+        contentView.addSubview(card2)
+        
+        // ── Card 3: Daily Digest Schedule (y: 110, height: 105) ──────
+        let card3 = createCardView(frame: NSRect(x: 24, y: 110, width: 552, height: 105))
+        
+        let card3Title = createSectionHeader(title: "Daily Digest Schedule", iconName: "calendar", frame: NSRect(x: 16, y: 72, width: 520, height: 22))
+        card3.addSubview(card3Title)
         
         dailyCheckCheckbox = NSButton(checkboxWithTitle: "Enable Daily Check at:", target: self, action: #selector(dailyCheckToggled))
-        dailyCheckCheckbox.frame = NSRect(x: 40, y: 155, width: 195, height: 22)
-        contentView.addSubview(dailyCheckCheckbox)
+        dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        dailyCheckCheckbox.frame = NSRect(x: 20, y: 40, width: 175, height: 22)
+        card3.addSubview(dailyCheckCheckbox)
         
-        timePopUp = NSPopUpButton(frame: NSRect(x: 245, y: 152, width: 255, height: 25))
+        timePopUp = NSPopUpButton(frame: NSRect(x: 200, y: 37, width: 330, height: 26))
         timePopUp.addItems(withTitles: timeOptions.map { $0.title })
-        contentView.addSubview(timePopUp)
+        card3.addSubview(timePopUp)
         
-        // Day Picker Pills (Sun - Sat)
-        let daysTitleLabel = NSTextField(labelWithString: "Active Check Days:")
-        daysTitleLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        daysTitleLabel.frame = NSRect(x: 40, y: 118, width: 140, height: 20)
-        contentView.addSubview(daysTitleLabel)
-        
-        let startX: CGFloat = 185
-        let btnWidth: CGFloat = 44
+        let startX: CGFloat = 200
+        let btnWidth: CGFloat = 43
         for (idx, dName) in dayNames.enumerated() {
             let btn = NSButton(title: dName, target: self, action: #selector(dayButtonToggled))
-            btn.frame = NSRect(x: startX + CGFloat(idx) * (btnWidth + 2), y: 115, width: btnWidth, height: 26)
+            btn.frame = NSRect(x: startX + CGFloat(idx) * (btnWidth + 4), y: 8, width: btnWidth, height: 24)
             btn.setButtonType(.pushOnPushOff)
             btn.bezelStyle = .recessed
+            btn.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
             btn.tag = idx
-            contentView.addSubview(btn)
+            card3.addSubview(btn)
             dayButtons.append(btn)
         }
         
-        // Launch at Login Section
-        let sysLabel = NSTextField(labelWithString: "System Integration:")
-        sysLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        sysLabel.frame = NSRect(x: 24, y: 75, width: 220, height: 20)
-        contentView.addSubview(sysLabel)
+        contentView.addSubview(card3)
         
-        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Automatically Launch Jobs Monitor at Mac Login", target: self, action: nil)
-        launchAtLoginCheckbox.frame = NSRect(x: 40, y: 50, width: 450, height: 22)
-        contentView.addSubview(launchAtLoginCheckbox)
+        // ── Card 4: System Integration (y: 58, height: 42) ───────────
+        let card4 = createCardView(frame: NSRect(x: 24, y: 58, width: 552, height: 42))
         
-        // Save Button
-        let saveBtn = NSButton(title: "Save & Apply Settings", target: self, action: #selector(saveClicked))
-        saveBtn.frame = NSRect(x: 340, y: 14, width: 160, height: 32)
+        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Automatically launch Jobs Monitor when starting your Mac", target: self, action: nil)
+        launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        launchAtLoginCheckbox.frame = NSRect(x: 16, y: 10, width: 520, height: 22)
+        card4.addSubview(launchAtLoginCheckbox)
+        
+        contentView.addSubview(card4)
+        
+        // ── Bottom Action Footer ──────────────────────────────────────
+        let cancelBtn = NSButton(title: "Cancel", target: self, action: #selector(cancelClicked))
+        cancelBtn.frame = NSRect(x: 360, y: 14, width: 100, height: 32)
+        cancelBtn.bezelStyle = .rounded
+        contentView.addSubview(cancelBtn)
+        
+        let saveBtn = NSButton(title: "Save Settings", target: self, action: #selector(saveClicked))
+        saveBtn.frame = NSRect(x: 465, y: 14, width: 112, height: 32)
         saveBtn.bezelStyle = .rounded
         saveBtn.keyEquivalent = "\r"
         contentView.addSubview(saveBtn)
+    }
+
+    func createCardView(frame: NSRect) -> NSView {
+        let card = NSView(frame: frame)
+        card.wantsLayer = true
+        card.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        card.layer?.cornerRadius = 10
+        card.layer?.borderWidth = 1
+        card.layer?.borderColor = NSColor.separatorColor.cgColor
+        return card
+    }
+
+    func createSectionHeader(title: String, iconName: String, frame: NSRect) -> NSView {
+        let header = NSView(frame: frame)
+        let iconView = NSImageView(frame: NSRect(x: 0, y: 1, width: 18, height: 18))
+        iconView.image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)
+        iconView.contentTintColor = .labelColor
+        header.addSubview(iconView)
+        
+        let label = NSTextField(labelWithString: title)
+        label.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+        label.frame = NSRect(x: 24, y: 0, width: frame.width - 24, height: 20)
+        header.addSubview(label)
+        return header
+    }
+
+    @objc func cancelClicked() {
+        window?.close()
     }
     
     @objc func radioChanged(_ sender: NSButton) {
@@ -874,6 +931,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initial job check & background update check
         performCheck(isManual: false)
         checkForUpdates(silentIfCurrent: true)
+        
+        // First Launch: Automatically open Preferences Window
+        let firstLaunchKey = "has_launched_jobsmonitor"
+        if !UserDefaults.standard.bool(forKey: firstLaunchKey) {
+            UserDefaults.standard.set(true, forKey: firstLaunchKey)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.openPreferences()
+            }
+        }
     }
     
     func updateBadge(unreadCount: Int) {
@@ -1230,8 +1296,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-// ── Application Main ───────────────────────────────────────────────────────────
+// ── Application Main (Single-Instance Kernel Lock) ──────────────────────────────
+try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
+let lockFilePath = appDir.appendingPathComponent("app.lock").path
+let lockFd = open(lockFilePath, O_CREAT | O_RDWR, 0o666)
+if lockFd < 0 || flock(lockFd, LOCK_EX | LOCK_NB) != 0 {
+    exit(0)
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()
+
