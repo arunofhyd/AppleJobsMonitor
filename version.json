@@ -1,7 +1,14 @@
 {
-  "version": "2.0.1",
+  "version": "2.0.2",
   "downloadURL": "https://github.com/arunofhyd/JobsMonitor/releases/latest",
   "changelog": [
+    {
+      "version": "2.0.2",
+      "date": "2026-07-24",
+      "changes": [
+        "Automated Homebrew Tap release integration using HOMEBREW_TAP_TOKEN."
+      ]
+    },
     {
       "version": "2.0.1",
       "date": "2026-07-24",
