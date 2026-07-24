@@ -551,7 +551,7 @@ class AboutWindowController: NSWindowController {
         // ghBtn.bezelStyle = .rounded
         // contentView.addSubview(ghBtn)
         
-        let contactBtn = NSButton(title: "Contact Developer ✉️", target: self, action: #selector(openContact))
+        let contactBtn = NSButton(title: "Contact Developer", target: self, action: #selector(openContact))
         contactBtn.frame = NSRect(x: 130, y: 30, width: 160, height: 32)
         contactBtn.bezelStyle = .rounded
         contentView.addSubview(contactBtn)
