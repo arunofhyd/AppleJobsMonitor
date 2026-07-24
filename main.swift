@@ -546,13 +546,13 @@ class AboutWindowController: NSWindowController {
         contentView.addSubview(openSourceLabel)
         
         // Action Buttons
-        let ghBtn = NSButton(title: "GitHub Repository ↗", target: self, action: #selector(openGitHub))
-        ghBtn.frame = NSRect(x: 65, y: 30, width: 140, height: 32)
-        ghBtn.bezelStyle = .rounded
-        contentView.addSubview(ghBtn)
+        // let ghBtn = NSButton(title: "GitHub Repository ↗", target: self, action: #selector(openGitHub))
+        // ghBtn.frame = NSRect(x: 65, y: 30, width: 140, height: 32)
+        // ghBtn.bezelStyle = .rounded
+        // contentView.addSubview(ghBtn)
         
         let contactBtn = NSButton(title: "Contact Developer ✉️", target: self, action: #selector(openContact))
-        contactBtn.frame = NSRect(x: 215, y: 30, width: 140, height: 32)
+        contactBtn.frame = NSRect(x: 130, y: 30, width: 160, height: 32)
         contactBtn.bezelStyle = .rounded
         contentView.addSubview(contactBtn)
     }
