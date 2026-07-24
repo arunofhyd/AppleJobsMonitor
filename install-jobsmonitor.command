@@ -79,7 +79,7 @@ if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
     mkdir -p "$BUILD_DIR_LOCAL"
     TARGET_APP="$BUILD_DIR_LOCAL/$APP_NAME.app"
 else
-    TARGET_APP="$HOME/Applications/$APP_NAME.app"
+    TARGET_APP="/Applications/$APP_NAME.app"
     pkill -x "$APP_NAME" 2>/dev/null
 fi
 rm -rf "$TARGET_APP"
