@@ -32,20 +32,7 @@ jobs:
           echo "$CHANGELOG" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Check if Release Exists
-        id: check_release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if gh release view "v${{ env.VERSION }}" > /dev/null 2>&1; then
-            echo "Release v${{ env.VERSION }} already exists. Skipping build and release."
-            echo "skip=true" >> $GITHUB_ENV
-          else
-            echo "skip=false" >> $GITHUB_ENV
-          fi
-
       - name: Build App (CI Mode)
-        if: env.skip == 'false'
         env:
           CI: "true"
         run: |
@@ -54,24 +41,22 @@ jobs:
           ./install-jobsmonitor.command
 
       - name: Zip the App
-        if: env.skip == 'false'
         run: |
           cd Build
           zip -r ../JobsMonitor.zip "JobsMonitor.app"
           cd ..
 
-      - name: Create Release
-        if: env.skip == 'false'
+      - name: Create or Update Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh release delete "v${{ env.VERSION }}" --yes || true
           gh release create "v${{ env.VERSION }}" JobsMonitor.zip \
             --title "v${{ env.VERSION }}" \
             --notes "${{ env.CHANGELOG }}" \
-            --target "$GITHUB_SHA"
+            --target "$GITHUB_SHA" || gh release upload "v${{ env.VERSION }}" JobsMonitor.zip --clobber
 
       - name: Calculate SHA256
-        if: env.skip == 'false'
         id: calc_sha
         run: |
           SHA256=$(shasum -a 256 JobsMonitor.zip | awk '{ print $1 }')
@@ -79,7 +64,6 @@ jobs:
           echo "Computed SHA256: $SHA256"
 
       - name: Checkout Homebrew Tap
-        if: env.skip == 'false'
         continue-on-error: true
         uses: actions/checkout@v4
         with:
@@ -88,7 +72,6 @@ jobs:
           path: homebrew-jobsmonitor
 
       - name: Update Formula
-        if: env.skip == 'false'
         continue-on-error: true
         run: |
           if [ -d "homebrew-jobsmonitor" ]; then
