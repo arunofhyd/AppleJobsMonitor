@@ -47,14 +47,14 @@ jobs:
         if: env.skip == 'false'
         run: |
           python3 generate_installer.py
-          chmod +x JobsMonitor.command
+          chmod +x install-jobsmonitor.command
 
       - name: Create GitHub Release
         if: env.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ env.VERSION }}" JobsMonitor.command \
+          gh release create "v${{ env.VERSION }}" install-jobsmonitor.command \
             --title "v${{ env.VERSION }}" \
             --notes "${{ env.CHANGELOG }}" \
             --target "$GITHUB_SHA"
