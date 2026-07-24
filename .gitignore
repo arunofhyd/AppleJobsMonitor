@@ -1,0 +1,8 @@
+*.py
+*.sh
+*.iconset
+*.app
+*.zip
+*.log
+.DS_Store
+!generate_installer.py

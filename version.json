@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "downloadURL": "https://github.com/arunofhyd/JobsMonitor/releases/latest",
+  "changelog": [
+    {
+      "version": "2.0.0",
+      "date": "2026-07-24",
+      "changes": [
+        "Renamed app cleanly to Jobs Monitor.",
+        "Added Check for Updates menu option with background version checking.",
+        "Added automated GitHub Release workflow (.github/workflows/auto-release.yml).",
+        "Added adaptive vector menu bar icon with clean outer handle geometry.",
+        "Added multi-location country & city preset support.",
+        "Added native macOS Preferences window with custom daily digest schedule.",
+        "Added Launch at Login integration via SMAppService and LaunchAgent."
+      ]
+    }
+  ]
+}
