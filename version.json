@@ -1,7 +1,16 @@
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "downloadURL": "https://github.com/arunofhyd/JobsMonitor/releases/latest",
   "changelog": [
+    {
+      "version": "2.0.1",
+      "date": "2026-07-24",
+      "changes": [
+        "Standardized bundle identifier to com.aoh.jobsmonitor.",
+        "Adopted install-jobsmonitor.command naming convention.",
+        "Added standalone on-the-fly icon compilation engine."
+      ]
+    },
     {
       "version": "2.0.0",
       "date": "2026-07-24",
