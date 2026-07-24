@@ -204,7 +204,7 @@ func setupLaunchAgent(enabled: Bool) {
     
     if enabled {
         try? FileManager.default.createDirectory(at: launchAgentsDir, withIntermediateDirectories: true)
-        let execPath = "/Users/arunthomas/Applications/JobsMonitor.app/Contents/MacOS/JobsMonitor"
+        let execPath = "/Applications/JobsMonitor.app/Contents/MacOS/JobsMonitor"
         let plistContent = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -509,7 +509,7 @@ class AboutWindowController: NSWindowController {
         
         // App Icon Image (96x96)
         let iconView = NSImageView(frame: NSRect(x: 162, y: 205, width: 96, height: 96))
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Users/arunthomas/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
             iconView.image = img
         }
@@ -621,7 +621,7 @@ class SettingsWindowController: NSWindowController {
         headerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         
         let iconView = NSImageView(frame: NSRect(x: 268, y: 13, width: 64, height: 64))
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Users/arunthomas/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
             iconView.image = img
         } else {
@@ -1324,7 +1324,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: "View Dashboard")
         alert.addButton(withTitle: "Dismiss")
         
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Users/arunthomas/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
             alert.icon = img
         }
