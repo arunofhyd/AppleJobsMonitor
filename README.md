@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="Jobs.png" alt="Jobs Monitor Logo" width="120" height="120">
+  <img src="logo-jobsmonitor.png" alt="Jobs Monitor Logo" width="120" height="120">
   <h1>Jobs Monitor</h1>
   <p><strong>Native macOS Menu Bar App for Apple Job Openings</strong></p>
   <p align="center">
@@ -33,6 +33,20 @@ Built specifically for engineers, designers, and professionals tracking roles ac
 *   **Adaptive Menu Bar Icon**:  Features a custom monochrome vector menu bar icon (Apple logo inside a magnifying glass) that dynamically adapts to macOS Light & Dark Modes.
 *   **Automatic Updates**: 🔄 Includes built-in version checking against GitHub Releases with release notes & one-click updates.
 *   **Launch at Login**: 🚀 Starts automatically at system startup via macOS `SMAppService` and LaunchAgent.
+
+
+## 🍺 Install via Homebrew
+
+You can install **Jobs Monitor** using Homebrew:
+
+```bash
+brew install --cask arunofhyd/jobsmonitor/jobsmonitor
+```
+
+To update via Homebrew in the future:
+```bash
+brew upgrade --cask jobsmonitor
+```
 
 ## 📦 Install
 

@@ -36,7 +36,6 @@ jobs:
         env:
           CI: "true"
         run: |
-          python3 generate_installer.py
           chmod +x install-jobsmonitor.command
           ./install-jobsmonitor.command
 

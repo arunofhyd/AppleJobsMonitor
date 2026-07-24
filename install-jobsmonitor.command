@@ -51,7 +51,7 @@ def build_app_ci():
     shutil.copy2(exec_path, macos_dir / APP_NAME)
     os.chmod(macos_dir / APP_NAME, 0o755)
     
-    png_source = build_dir / "Jobs.png"
+    png_source = build_dir / "logo-jobsmonitor.png"
     if JOBS_PNG_B64:
         with open(png_source, "wb") as f:
             f.write(base64.b64decode(JOBS_PNG_B64))
@@ -67,7 +67,7 @@ def build_app_ci():
             (512, "icon_512x512.png"), (1024, "icon_512x512@2x.png")
         ]
         for sz, filename in sizes:
-            subprocess.run(["sips", "-z", str(sz), str(sz), str(png_source), "--out", str(iconset / filename)], capture_output=True)
+            subprocess.run(["sips", "-s", "format", "png", "-z", str(sz), str(sz), str(png_source), "--out", str(iconset / filename)], capture_output=True)
             
         icns_out = resources_dir / "AppIcon.icns"
         subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(icns_out)], capture_output=True)
