@@ -1,7 +1,15 @@
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "downloadURL": "https://github.com/arunofhyd/JobsMonitor/releases/latest",
   "changelog": [
+    {
+      "version": "2.0.1",
+      "date": "2026-07-24",
+      "changes": [
+        "Automated Homebrew Tap updates via GitHub Actions secret integration.",
+        "Included pre-compiled JobsMonitor.zip in GitHub Releases for Homebrew Cask."
+      ]
+    },
     {
       "version": "2.0.0",
       "date": "2026-07-24",
