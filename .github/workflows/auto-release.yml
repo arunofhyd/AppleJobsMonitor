@@ -43,18 +43,64 @@ jobs:
             echo "skip=false" >> $GITHUB_ENV
           fi
 
-      - name: Generate Installer Command
+      - name: Build App (CI Mode)
         if: env.skip == 'false'
+        env:
+          CI: "true"
         run: |
           python3 generate_installer.py
           chmod +x install-jobsmonitor.command
+          ./install-jobsmonitor.command
 
-      - name: Create GitHub Release
+      - name: Zip the App
+        if: env.skip == 'false'
+        run: |
+          cd Build
+          zip -r ../JobsMonitor.zip "JobsMonitor.app"
+          cd ..
+
+      - name: Create Release
         if: env.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ env.VERSION }}" install-jobsmonitor.command \
+          gh release create "v${{ env.VERSION }}" JobsMonitor.zip \
             --title "v${{ env.VERSION }}" \
             --notes "${{ env.CHANGELOG }}" \
             --target "$GITHUB_SHA"
+
+      - name: Calculate SHA256
+        if: env.skip == 'false'
+        id: calc_sha
+        run: |
+          SHA256=$(shasum -a 256 JobsMonitor.zip | awk '{ print $1 }')
+          echo "SHA256=$SHA256" >> $GITHUB_ENV
+          echo "Computed SHA256: $SHA256"
+
+      - name: Checkout Homebrew Tap
+        if: env.skip == 'false'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: arunofhyd/homebrew-jobsmonitor
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-jobsmonitor
+
+      - name: Update Formula
+        if: env.skip == 'false'
+        continue-on-error: true
+        run: |
+          if [ -d "homebrew-jobsmonitor" ]; then
+            cd homebrew-jobsmonitor
+            sed -i '' -e "s/version \".*\"/version \"${{ env.VERSION }}\"/" Casks/jobsmonitor.rb
+            sed -i '' -e "s/sha256 \".*\"/sha256 \"${{ env.SHA256 }}\"/" Casks/jobsmonitor.rb
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add Casks/jobsmonitor.rb
+            if git diff --staged --quiet; then
+              echo "No changes to commit"
+            else
+              git commit -m "Update jobsmonitor to v${{ env.VERSION }}"
+              git push
+            fi
+          fi

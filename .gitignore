@@ -5,4 +5,7 @@
 *.zip
 *.log
 .DS_Store
+Build/
+homebrew-jobsmonitor/
+homebrew_cask_template/
 !generate_installer.py
