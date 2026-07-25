@@ -570,6 +570,38 @@ class AboutWindowController: NSWindowController {
     }
 }
 
+// ── Dynamic Appearance Card & Header Views for Preferences ──────────────────────
+class SettingsHeaderView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func updateLayer() {
+        super.updateLayer()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        }
+    }
+}
+
+class SettingsCardView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 10
+        layer?.borderWidth = 1
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func updateLayer() {
+        super.updateLayer()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            layer?.borderColor = NSColor.separatorColor.cgColor
+        }
+    }
+}
+
 // ── Native Preferences Window ──────────────────────────────────────────────────
 class SettingsWindowController: NSWindowController {
     var radioCountry: NSButton!
@@ -612,13 +644,9 @@ class SettingsWindowController: NSWindowController {
     
     func setupUI() {
         guard let contentView = window?.contentView else { return }
-        contentView.wantsLayer = true
-        contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         
         // ── Top Header Banner (Centralized Logo Only) ─────────────────
-        let headerView = NSView(frame: NSRect(x: 0, y: 540, width: 600, height: 90))
-        headerView.wantsLayer = true
-        headerView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 540, width: 600, height: 90))
         
         let iconView = NSImageView(frame: NSRect(x: 268, y: 13, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -1284,7 +1312,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             let newJobs = isFirstRun ? [] : jobs.filter { !seenSet.contains($0.id) }
             
-            let timeStr = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "d MMM HH:mm"
+            let timeStr = formatter.string(from: Date())
             state.last_checked_str = timeStr
             state.last_job_count = jobs.count
             
