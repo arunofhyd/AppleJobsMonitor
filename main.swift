@@ -1050,15 +1050,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         viewDashItem.target = self
         menu.addItem(viewDashItem)
         
-        menu.addItem(NSMenuItem.separator())
-        
         // Preferences Item with Icon
         let prefItem = NSMenuItem(title: "Preferences", action: #selector(openPreferences), keyEquivalent: ",")
         prefItem.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
         prefItem.target = self
         menu.addItem(prefItem)
-        
-        menu.addItem(NSMenuItem.separator())
         
         // About Item with Icon
         let aboutItem = NSMenuItem(title: "About", action: #selector(openAbout), keyEquivalent: "i")
@@ -1071,8 +1067,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath.circle.fill", accessibilityDescription: nil)
         updateItem.target = self
         menu.addItem(updateItem)
-        
-        menu.addItem(NSMenuItem.separator())
         
         // Quit Item with Icon
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quitClicked), keyEquivalent: "q")
