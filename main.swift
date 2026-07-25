@@ -326,6 +326,12 @@ func saveStateData(_ st: StateData) {
     }
 }
 
+func getUserFirstName() -> String {
+    let fullName = NSFullUserName()
+    let firstName = fullName.components(separatedBy: " ").first ?? ""
+    return firstName.isEmpty ? "There" : firstName
+}
+
 // ── HTML Dashboard Generator ───────────────────────────────────────────────────
 func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, locationTitle: String, searchUrl: String) -> String {
     var rows = ""
@@ -1331,7 +1337,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.updateBadge(unreadCount: currentUnread)
                 self.rebuildMenu()
                 
-                let greeting = "Hi Arun 👋 — \(jobs.count) active roles currently tracked for <strong>\(settings.locationTitle)</strong>:"
+                let firstName = getUserFirstName()
+                let greeting = "Hi \(firstName) 👋 — \(jobs.count) active roles currently tracked for <strong>\(settings.locationTitle)</strong>:"
                 let htmlStr = generateDashboardHTML(jobs: jobs.isEmpty ? [] : Array(jobs.prefix(20)),
                                                      greeting: greeting,
                                                      subtitle: "\(jobs.count) active openings",
