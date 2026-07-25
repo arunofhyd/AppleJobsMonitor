@@ -1,7 +1,17 @@
 {
-  "version": "2.0.2",
-  "downloadURL": "https://github.com/arunofhyd/JobsMonitor/releases/latest",
+  "version": "2.0.3",
+  "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.0.3",
+      "date": "2026-07-25",
+      "changes": [
+        "Preferences UI contrast fix for Light Mode and Dark Mode.",
+        "Simplified Preferences labels and pixel-perfect day button alignment.",
+        "Short date and time timestamp for Last Checked status item.",
+        "Menu layout polish and 1-click in-app auto-update execution."
+      ]
+    },
     {
       "version": "2.0.2",
       "date": "2026-07-24",
