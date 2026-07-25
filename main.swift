@@ -666,10 +666,10 @@ class SettingsWindowController: NSWindowController {
         // ── Card 1: Target Location (y: 355, height: 170) ────────────
         let card1 = createCardView(frame: NSRect(x: 24, y: 355, width: 552, height: 170))
         
-        let card1Title = createSectionHeader(title: "Target Search Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 135, width: 520, height: 22))
+        let card1Title = createSectionHeader(title: "Search Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 135, width: 520, height: 22))
         card1.addSubview(card1Title)
         
-        radioCountry = NSButton(radioButtonWithTitle: "Country Preset:", target: self, action: #selector(radioChanged))
+        radioCountry = NSButton(radioButtonWithTitle: "Country:", target: self, action: #selector(radioChanged))
         radioCountry.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         radioCountry.frame = NSRect(x: 20, y: 100, width: 140, height: 22)
         radioCountry.tag = 0
@@ -679,7 +679,7 @@ class SettingsWindowController: NSWindowController {
         countryPopUp.addItems(withTitles: countryPresets.map { $0.name })
         card1.addSubview(countryPopUp)
         
-        radioCity = NSButton(radioButtonWithTitle: "City Preset:", target: self, action: #selector(radioChanged))
+        radioCity = NSButton(radioButtonWithTitle: "City:", target: self, action: #selector(radioChanged))
         radioCity.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         radioCity.frame = NSRect(x: 20, y: 65, width: 140, height: 22)
         radioCity.tag = 1
@@ -704,10 +704,10 @@ class SettingsWindowController: NSWindowController {
         // ── Card 2: Frequency & Alerts (y: 230, height: 110) ─────────
         let card2 = createCardView(frame: NSRect(x: 24, y: 230, width: 552, height: 110))
         
-        let card2Title = createSectionHeader(title: "Frequency & Notifications", iconName: "clock.fill", frame: NSRect(x: 16, y: 75, width: 520, height: 22))
+        let card2Title = createSectionHeader(title: "Check Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 75, width: 520, height: 22))
         card2.addSubview(card2Title)
         
-        let intervalLabel = NSTextField(labelWithString: "Background Check Interval:")
+        let intervalLabel = NSTextField(labelWithString: "Check Interval:")
         intervalLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         intervalLabel.frame = NSRect(x: 20, y: 44, width: 220, height: 20)
         card2.addSubview(intervalLabel)
@@ -716,7 +716,7 @@ class SettingsWindowController: NSWindowController {
         intervalPopUp.addItems(withTitles: ["5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "6 Hours"])
         card2.addSubview(intervalPopUp)
         
-        let dismissLabel = NSTextField(labelWithString: "Alert Box Auto-Dismiss:")
+        let dismissLabel = NSTextField(labelWithString: "Auto-Dismiss Alert:")
         dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         dismissLabel.frame = NSRect(x: 20, y: 12, width: 220, height: 20)
         card2.addSubview(dismissLabel)
@@ -730,10 +730,10 @@ class SettingsWindowController: NSWindowController {
         // ── Card 3: Daily Digest Schedule (y: 110, height: 105) ──────
         let card3 = createCardView(frame: NSRect(x: 24, y: 110, width: 552, height: 105))
         
-        let card3Title = createSectionHeader(title: "Daily Digest Schedule", iconName: "calendar", frame: NSRect(x: 16, y: 72, width: 520, height: 22))
+        let card3Title = createSectionHeader(title: "Daily Digest", iconName: "calendar", frame: NSRect(x: 16, y: 72, width: 520, height: 22))
         card3.addSubview(card3Title)
         
-        dailyCheckCheckbox = NSButton(checkboxWithTitle: "Enable Daily Check at:", target: self, action: #selector(dailyCheckToggled))
+        dailyCheckCheckbox = NSButton(checkboxWithTitle: "Run Daily Check at:", target: self, action: #selector(dailyCheckToggled))
         dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         dailyCheckCheckbox.frame = NSRect(x: 20, y: 40, width: 175, height: 22)
         card3.addSubview(dailyCheckCheckbox)
@@ -760,7 +760,7 @@ class SettingsWindowController: NSWindowController {
         // ── Card 4: System Integration (y: 58, height: 42) ───────────
         let card4 = createCardView(frame: NSRect(x: 24, y: 58, width: 552, height: 42))
         
-        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Automatically launch Jobs Monitor when starting your Mac", target: self, action: nil)
+        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at Login", target: self, action: nil)
         launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         launchAtLoginCheckbox.frame = NSRect(x: 16, y: 10, width: 520, height: 22)
         card4.addSubview(launchAtLoginCheckbox)
