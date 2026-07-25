@@ -730,10 +730,10 @@ class SettingsWindowController: NSWindowController {
         // ── Card 3: Daily Digest Schedule (y: 110, height: 105) ──────
         let card3 = createCardView(frame: NSRect(x: 24, y: 110, width: 552, height: 105))
         
-        let card3Title = createSectionHeader(title: "Daily Digest", iconName: "calendar", frame: NSRect(x: 16, y: 72, width: 520, height: 22))
+        let card3Title = createSectionHeader(title: "Daily Popup", iconName: "calendar", frame: NSRect(x: 16, y: 72, width: 520, height: 22))
         card3.addSubview(card3Title)
         
-        dailyCheckCheckbox = NSButton(checkboxWithTitle: "Run Daily Check at:", target: self, action: #selector(dailyCheckToggled))
+        dailyCheckCheckbox = NSButton(checkboxWithTitle: "Show Daily Popup at:", target: self, action: #selector(dailyCheckToggled))
         dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         dailyCheckCheckbox.frame = NSRect(x: 20, y: 40, width: 175, height: 22)
         card3.addSubview(dailyCheckCheckbox)
@@ -743,10 +743,14 @@ class SettingsWindowController: NSWindowController {
         card3.addSubview(timePopUp)
         
         let startX: CGFloat = 200
-        let btnWidth: CGFloat = 43
+        let totalW: CGFloat = 330.0
+        let spacing: CGFloat = 4.0
+        let btnWidth: CGFloat = (totalW - 6.0 * spacing) / 7.0
+        
         for (idx, dName) in dayNames.enumerated() {
+            let btnX = startX + CGFloat(idx) * (btnWidth + spacing)
             let btn = NSButton(title: dName, target: self, action: #selector(dayButtonToggled))
-            btn.frame = NSRect(x: startX + CGFloat(idx) * (btnWidth + 4), y: 8, width: btnWidth, height: 24)
+            btn.frame = NSRect(x: btnX, y: 8, width: btnWidth, height: 24)
             btn.setButtonType(.pushOnPushOff)
             btn.bezelStyle = .recessed
             btn.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
