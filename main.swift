@@ -1014,14 +1014,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         let state = loadStateData()
         
-        // Title Item with Icon
-        let titleItem = NSMenuItem(title: "Jobs Monitor v\(APP_VERSION)", action: nil, keyEquivalent: "")
+        // Title Item with Icon (Version removed)
+        let titleItem = NSMenuItem(title: "Jobs Monitor", action: nil, keyEquivalent: "")
         titleItem.image = NSImage(systemSymbolName: "apple.logo", accessibilityDescription: nil)
         titleItem.isEnabled = false
         menu.addItem(titleItem)
         
         // Last Checked Time Item with Clock Icon
-        let lastCheckedText = state.last_checked_str ?? "Just now"
+        var lastCheckedText = state.last_checked_str ?? "Just now"
+        if lastCheckedText.contains("AM") || lastCheckedText.contains("PM") || lastCheckedText == "Never" {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "d MMM, HH:mm"
+            lastCheckedText = formatter.string(from: Date())
+        }
         let checkTimeItem = NSMenuItem(title: "Last Checked: \(lastCheckedText)", action: nil, keyEquivalent: "")
         checkTimeItem.image = NSImage(systemSymbolName: "clock.fill", accessibilityDescription: nil)
         checkTimeItem.isEnabled = false
@@ -1313,7 +1318,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let newJobs = isFirstRun ? [] : jobs.filter { !seenSet.contains($0.id) }
             
             let formatter = DateFormatter()
-            formatter.dateFormat = "d MMM HH:mm"
+            formatter.dateFormat = "d MMM, HH:mm"
             let timeStr = formatter.string(from: Date())
             state.last_checked_str = timeStr
             state.last_job_count = jobs.count
