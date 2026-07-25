@@ -1056,6 +1056,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         prefItem.target = self
         menu.addItem(prefItem)
         
+        menu.addItem(NSMenuItem.separator())
+        
         // About Item with Icon
         let aboutItem = NSMenuItem(title: "About", action: #selector(openAbout), keyEquivalent: "i")
         aboutItem.image = NSImage(systemSymbolName: "info.circle.fill", accessibilityDescription: nil)
