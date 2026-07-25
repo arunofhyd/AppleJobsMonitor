@@ -716,7 +716,7 @@ class SettingsWindowController: NSWindowController {
         intervalPopUp.addItems(withTitles: ["5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "6 Hours"])
         card2.addSubview(intervalPopUp)
         
-        let dismissLabel = NSTextField(labelWithString: "Auto-Dismiss Alert:")
+        let dismissLabel = NSTextField(labelWithString: "Auto-Dismiss Popup:")
         dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         dismissLabel.frame = NSRect(x: 20, y: 12, width: 220, height: 20)
         card2.addSubview(dismissLabel)
