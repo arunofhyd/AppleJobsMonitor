@@ -670,7 +670,7 @@ class SettingsWindowController: NSWindowController {
         card1.addSubview(card1Title)
         
         radioCountry = NSButton(radioButtonWithTitle: "Country:", target: self, action: #selector(radioChanged))
-        radioCountry.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        radioCountry.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         radioCountry.frame = NSRect(x: 20, y: 100, width: 140, height: 22)
         radioCountry.tag = 0
         card1.addSubview(radioCountry)
@@ -680,7 +680,7 @@ class SettingsWindowController: NSWindowController {
         card1.addSubview(countryPopUp)
         
         radioCity = NSButton(radioButtonWithTitle: "City:", target: self, action: #selector(radioChanged))
-        radioCity.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        radioCity.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         radioCity.frame = NSRect(x: 20, y: 65, width: 140, height: 22)
         radioCity.tag = 1
         card1.addSubview(radioCity)
@@ -690,7 +690,7 @@ class SettingsWindowController: NSWindowController {
         card1.addSubview(cityPopUp)
         
         radioCustom = NSButton(radioButtonWithTitle: "Custom URL:", target: self, action: #selector(radioChanged))
-        radioCustom.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        radioCustom.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         radioCustom.frame = NSRect(x: 20, y: 30, width: 140, height: 22)
         radioCustom.tag = 2
         card1.addSubview(radioCustom)
@@ -734,7 +734,7 @@ class SettingsWindowController: NSWindowController {
         card3.addSubview(card3Title)
         
         dailyCheckCheckbox = NSButton(checkboxWithTitle: "Show Daily Popup at:", target: self, action: #selector(dailyCheckToggled))
-        dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         dailyCheckCheckbox.frame = NSRect(x: 20, y: 40, width: 175, height: 22)
         card3.addSubview(dailyCheckCheckbox)
         
@@ -753,7 +753,7 @@ class SettingsWindowController: NSWindowController {
             btn.frame = NSRect(x: btnX, y: 8, width: btnWidth, height: 24)
             btn.setButtonType(.pushOnPushOff)
             btn.bezelStyle = .recessed
-            btn.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+            btn.font = NSFont.systemFont(ofSize: 11, weight: .regular)
             btn.tag = idx
             card3.addSubview(btn)
             dayButtons.append(btn)
@@ -765,7 +765,7 @@ class SettingsWindowController: NSWindowController {
         let card4 = createCardView(frame: NSRect(x: 24, y: 58, width: 552, height: 42))
         
         launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at Login", target: self, action: nil)
-        launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         launchAtLoginCheckbox.frame = NSRect(x: 16, y: 10, width: 520, height: 22)
         card4.addSubview(launchAtLoginCheckbox)
         
