@@ -1038,8 +1038,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Check Now Item with Icon
-        let checkNowItem = NSMenuItem(title: "Check Jobs Now", action: #selector(checkNowClicked), keyEquivalent: "r")
+        // Check Jobs Item with Icon
+        let checkNowItem = NSMenuItem(title: "Check Jobs", action: #selector(checkNowClicked), keyEquivalent: "r")
         checkNowItem.image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: nil)
         checkNowItem.target = self
         menu.addItem(checkNowItem)
@@ -1052,23 +1052,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Check for Updates Item with Icon
-        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(manualUpdateCheck), keyEquivalent: "u")
-        updateItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath.circle.fill", accessibilityDescription: nil)
-        updateItem.target = self
-        menu.addItem(updateItem)
-        
         // Preferences Item with Icon
         let prefItem = NSMenuItem(title: "Preferences", action: #selector(openPreferences), keyEquivalent: ",")
         prefItem.image = NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
         prefItem.target = self
         menu.addItem(prefItem)
         
+        menu.addItem(NSMenuItem.separator())
+        
         // About Item with Icon
         let aboutItem = NSMenuItem(title: "About", action: #selector(openAbout), keyEquivalent: "i")
         aboutItem.image = NSImage(systemSymbolName: "info.circle.fill", accessibilityDescription: nil)
         aboutItem.target = self
         menu.addItem(aboutItem)
+        
+        // Check for Updates Item with Icon
+        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(manualUpdateCheck), keyEquivalent: "u")
+        updateItem.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath.circle.fill", accessibilityDescription: nil)
+        updateItem.target = self
+        menu.addItem(updateItem)
         
         menu.addItem(NSMenuItem.separator())
         
