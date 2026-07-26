@@ -3,7 +3,7 @@ import Foundation
 import ServiceManagement
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.0.4"
+let APP_VERSION = "2.0.5"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -791,12 +791,7 @@ class SettingsWindowController: NSWindowController {
     }
 
     func createCardView(frame: NSRect) -> NSView {
-        let card = NSView(frame: frame)
-        card.wantsLayer = true
-        card.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        card.layer?.cornerRadius = 10
-        card.layer?.borderWidth = 1
-        card.layer?.borderColor = NSColor.separatorColor.cgColor
+        let card = SettingsCardView(frame: frame)
         return card
     }
 
@@ -1229,6 +1224,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         calendar.timeZone = TimeZone.current
         
         let now = Date()
+        
+        // ── Check if today's daily popup was missed (laptop was off at scheduled time) ──
+        let todayWeekdayIndex = calendar.component(.weekday, from: now) - 1 // 0=Sun, 1=Mon, ..., 6=Sat
+        if activeDays[todayWeekdayIndex] {
+            var todayComp = calendar.dateComponents([.year, .month, .day], from: now)
+            todayComp.hour = targetHour
+            todayComp.minute = targetMinute
+            todayComp.second = 0
+            
+            if let scheduledToday = calendar.date(from: todayComp), scheduledToday <= now {
+                // Scheduled time for today has passed — check if we already showed it today
+                let state = loadStateData()
+                let dateOnlyFormatter = DateFormatter()
+                dateOnlyFormatter.dateFormat = "yyyy-MM-dd"
+                let todayStr = dateOnlyFormatter.string(from: now)
+                let lastPopupDate = state.last_daily_popup ?? ""
+                
+                if lastPopupDate != todayStr {
+                    // Missed today's popup — fire it now
+                    logMessage("Missed daily popup for today (\(todayStr)) — triggering now")
+                    var updatedState = state
+                    updatedState.last_daily_popup = todayStr
+                    saveStateData(updatedState)
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                        self?.performCheck(isManual: true)
+                    }
+                }
+            }
+        }
+        
+        // ── Schedule the next future daily popup ──────────────────────────
         var foundDate: Date? = nil
         
         for dayOffset in 0..<14 {
@@ -1252,6 +1279,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logMessage("Scheduled Daily Digest Check for \(DateFormatter.localizedString(from: nextDate, dateStyle: .short, timeStyle: .short))")
         
         dailyTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { [weak self] _ in
+            // Record that we showed today's popup
+            let dateOnlyFormatter = DateFormatter()
+            dateOnlyFormatter.dateFormat = "yyyy-MM-dd"
+            var state = loadStateData()
+            state.last_daily_popup = dateOnlyFormatter.string(from: Date())
+            saveStateData(state)
+            
             self?.performCheck(isManual: true)
             self?.scheduleDailyTimer()
         }
