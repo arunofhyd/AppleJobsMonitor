@@ -1,7 +1,14 @@
 {
-  "version": "2.0.8",
+  "version": "2.0.9",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.0.9",
+      "date": "2026-07-27",
+      "changes": [
+        "Fixed blue-tinted background in Preferences window — now uses correct neutral system grey in both Light and Dark mode."
+      ]
+    },
     {
       "version": "2.0.8",
       "date": "2026-07-27",
