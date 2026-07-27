@@ -745,7 +745,7 @@ class SettingsHeaderView: NSView {
     override func updateLayer() {
         super.updateLayer()
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         }
     }
 }
@@ -761,7 +761,7 @@ class SettingsCardView: NSView {
     override func updateLayer() {
         super.updateLayer()
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             layer?.borderColor = NSColor.separatorColor.cgColor
         }
     }
@@ -801,6 +801,7 @@ class SettingsWindowController: NSWindowController {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
+        window.backgroundColor = NSColor.windowBackgroundColor
         window.center()
         self.init(window: window)
         
@@ -873,7 +874,7 @@ class SettingsWindowController: NSWindowController {
         let card2Title = createSectionHeader(title: "Refresh Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 54, width: 520, height: 22))
         card2.addSubview(card2Title)
         
-        let intervalLabel = NSTextField(labelWithString: "Check for new jobs every:")
+        let intervalLabel = NSTextField(labelWithString: "Check for new jobs every")
         intervalLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         intervalLabel.frame = NSRect(x: 20, y: 20, width: 220, height: 20)
         card2.addSubview(intervalLabel)
@@ -891,7 +892,7 @@ class SettingsWindowController: NSWindowController {
         card3.addSubview(card3Title)
 
         // Sound and Dismiss alert go first inside Alerts & Notifications
-        let soundLabel = NSTextField(labelWithString: "Sound:")
+        let soundLabel = NSTextField(labelWithString: "Sound")
         soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         soundLabel.frame = NSRect(x: 20, y: 130, width: 220, height: 20)
         card3.addSubview(soundLabel)
@@ -906,7 +907,7 @@ class SettingsWindowController: NSWindowController {
         previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         card3.addSubview(previewBtn)
         
-        let dismissLabel = NSTextField(labelWithString: "Dismiss alert after:")
+        let dismissLabel = NSTextField(labelWithString: "Dismiss alert after")
         dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         dismissLabel.frame = NSRect(x: 20, y: 94, width: 220, height: 20)
         card3.addSubview(dismissLabel)
@@ -916,7 +917,7 @@ class SettingsWindowController: NSWindowController {
         card3.addSubview(dismissPopUp)
         
         // Daily Summary settings under Alerts & Notifications
-        dailyCheckCheckbox = NSButton(checkboxWithTitle: "  Show daily summary at:", target: self, action: #selector(dailyCheckToggled))
+        dailyCheckCheckbox = NSButton(checkboxWithTitle: "  Show daily summary at", target: self, action: #selector(dailyCheckToggled))
         dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         dailyCheckCheckbox.frame = NSRect(x: 20, y: 50, width: 190, height: 22)
         card3.addSubview(dailyCheckCheckbox)
