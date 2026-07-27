@@ -1,7 +1,17 @@
 {
-  "version": "2.0.7",
+  "version": "2.0.8",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.0.8",
+      "date": "2026-07-27",
+      "changes": [
+        "Expanded check interval options to include 12 Hours and 24 Hours.",
+        "Simplified preferences UI labels for clarity.",
+        "Relocated alert dismiss and notification sound settings into a unified card.",
+        "Replaced time picker wheel with a text-based dropdown for daily popup schedule."
+      ]
+    },
     {
       "version": "2.0.7",
       "date": "2026-07-27",

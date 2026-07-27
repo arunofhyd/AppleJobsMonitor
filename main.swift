@@ -4,7 +4,7 @@ import ServiceManagement
 import SwiftUI
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.0.7"
+let APP_VERSION = "2.0.8"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -266,7 +266,7 @@ struct AppSettings: Codable {
     var countryIndex: Int
     var cityIndex: Int
     var customUrl: String
-    var checkIntervalMinutes: Int // 5, 15, 30, 60, 120, 240, 360
+    var checkIntervalMinutes: Int // 5, 15, 30, 60, 120, 240, 360, 720, 1440
     var popupDismissSeconds: Int // 10, 30, 60, 180, 300, 600, 0
     var notificationSound: String // system sound name, or "" for none
     var enableDailyCheck: Bool
@@ -792,7 +792,7 @@ class SettingsWindowController: NSWindowController {
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 740),
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 750),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -812,7 +812,7 @@ class SettingsWindowController: NSWindowController {
         guard let contentView = window?.contentView else { return }
         
         // ── Top Header Banner (Centralized Logo Only) ─────────────────
-        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 650, width: 600, height: 90))
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 660, width: 600, height: 90))
         
         let iconView = NSImageView(frame: NSRect(x: 268, y: 13, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -829,13 +829,13 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(headerView)
         
-        // ── Card 1: Target Location (y: 470, height: 164) ────────────
-        let card1 = createCardView(frame: NSRect(x: 24, y: 470, width: 552, height: 164))
+        // ── Card 1: Target Location (y: 480, height: 164) ────────────
+        let card1 = createCardView(frame: NSRect(x: 24, y: 480, width: 552, height: 164))
         
-        let card1Title = createSectionHeader(title: "Search Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 128, width: 520, height: 22))
+        let card1Title = createSectionHeader(title: "Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 128, width: 520, height: 22))
         card1.addSubview(card1Title)
         
-        radioCountry = NSButton(radioButtonWithTitle: "  Country:", target: self, action: #selector(radioChanged))
+        radioCountry = NSButton(radioButtonWithTitle: "  Country", target: self, action: #selector(radioChanged))
         radioCountry.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         radioCountry.frame = NSRect(x: 20, y: 92, width: 140, height: 22)
         radioCountry.tag = 0
@@ -845,7 +845,7 @@ class SettingsWindowController: NSWindowController {
         countryPopUp.addItems(withTitles: countryPresets.map { $0.name })
         card1.addSubview(countryPopUp)
         
-        radioCity = NSButton(radioButtonWithTitle: "  City:", target: self, action: #selector(radioChanged))
+        radioCity = NSButton(radioButtonWithTitle: "  City", target: self, action: #selector(radioChanged))
         radioCity.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         radioCity.frame = NSRect(x: 20, y: 56, width: 140, height: 22)
         radioCity.tag = 1
@@ -855,7 +855,7 @@ class SettingsWindowController: NSWindowController {
         cityPopUp.addItems(withTitles: cityPresets.map { $0.name })
         card1.addSubview(cityPopUp)
         
-        radioCustom = NSButton(radioButtonWithTitle: "  Custom URL:", target: self, action: #selector(radioChanged))
+        radioCustom = NSButton(radioButtonWithTitle: "  Custom URL", target: self, action: #selector(radioChanged))
         radioCustom.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         radioCustom.frame = NSRect(x: 20, y: 20, width: 140, height: 22)
         radioCustom.tag = 2
@@ -867,54 +867,56 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card1)
         
-        // ── Card 2: Frequency & Alerts (y: 290, height: 164) ─────────
-        let card2 = createCardView(frame: NSRect(x: 24, y: 290, width: 552, height: 164))
+        // ── Card 2: Refresh Frequency (y: 374, height: 90) ─────────
+        let card2 = createCardView(frame: NSRect(x: 24, y: 374, width: 552, height: 90))
         
-        let card2Title = createSectionHeader(title: "Check Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 128, width: 520, height: 22))
+        let card2Title = createSectionHeader(title: "Refresh Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 54, width: 520, height: 22))
         card2.addSubview(card2Title)
         
-        let intervalLabel = NSTextField(labelWithString: "Check Interval:")
+        let intervalLabel = NSTextField(labelWithString: "Check for new jobs every:")
         intervalLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        intervalLabel.frame = NSRect(x: 20, y: 94, width: 220, height: 20)
+        intervalLabel.frame = NSRect(x: 20, y: 20, width: 220, height: 20)
         card2.addSubview(intervalLabel)
         
-        intervalPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 91, width: 285, height: 26))
-        intervalPopUp.addItems(withTitles: ["5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "6 Hours"])
+        intervalPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 17, width: 285, height: 26))
+        intervalPopUp.addItems(withTitles: ["5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "6 Hours", "12 Hours", "24 Hours"])
         card2.addSubview(intervalPopUp)
-        
-        let dismissLabel = NSTextField(labelWithString: "Auto-Dismiss Popup:")
-        dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        dismissLabel.frame = NSRect(x: 20, y: 58, width: 220, height: 20)
-        card2.addSubview(dismissLabel)
-        
-        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 55, width: 285, height: 26))
-        dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
-        card2.addSubview(dismissPopUp)
-        
-        let soundLabel = NSTextField(labelWithString: "Notification Sound:")
-        soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        soundLabel.frame = NSRect(x: 20, y: 22, width: 220, height: 20)
-        card2.addSubview(soundLabel)
-        
-        soundPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 19, width: 225, height: 26))
-        soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
-        card2.addSubview(soundPopUp)
-        
-        let previewBtn = NSButton(title: "▶", target: self, action: #selector(previewSound))
-        previewBtn.frame = NSRect(x: 476, y: 19, width: 54, height: 26)
-        previewBtn.bezelStyle = .rounded
-        previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        card2.addSubview(previewBtn)
         
         contentView.addSubview(card2)
         
-        // ── Card 3: Daily Digest Schedule (y: 154, height: 120) ──────
-        let card3 = createCardView(frame: NSRect(x: 24, y: 154, width: 552, height: 120))
+        // ── Card 3: Alerts & Notifications (y: 158, height: 200) ──────
+        let card3 = createCardView(frame: NSRect(x: 24, y: 158, width: 552, height: 200))
         
-        let card3Title = createSectionHeader(title: "Daily Popup", iconName: "calendar", frame: NSRect(x: 16, y: 84, width: 520, height: 22))
+        let card3Title = createSectionHeader(title: "Alerts & Notifications", iconName: "bell.fill", frame: NSRect(x: 16, y: 164, width: 520, height: 22))
         card3.addSubview(card3Title)
+
+        // Sound and Dismiss alert go first inside Alerts & Notifications
+        let soundLabel = NSTextField(labelWithString: "Sound:")
+        soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        soundLabel.frame = NSRect(x: 20, y: 130, width: 220, height: 20)
+        card3.addSubview(soundLabel)
         
-        dailyCheckCheckbox = NSButton(checkboxWithTitle: "  Show Daily Popup at:", target: self, action: #selector(dailyCheckToggled))
+        soundPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 127, width: 225, height: 26))
+        soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
+        card3.addSubview(soundPopUp)
+        
+        let previewBtn = NSButton(title: "▶", target: self, action: #selector(previewSound))
+        previewBtn.frame = NSRect(x: 476, y: 127, width: 54, height: 26)
+        previewBtn.bezelStyle = .rounded
+        previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        card3.addSubview(previewBtn)
+        
+        let dismissLabel = NSTextField(labelWithString: "Dismiss alert after:")
+        dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        dismissLabel.frame = NSRect(x: 20, y: 94, width: 220, height: 20)
+        card3.addSubview(dismissLabel)
+        
+        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 91, width: 285, height: 26))
+        dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
+        card3.addSubview(dismissPopUp)
+        
+        // Daily Summary settings under Alerts & Notifications
+        dailyCheckCheckbox = NSButton(checkboxWithTitle: "  Show daily summary at:", target: self, action: #selector(dailyCheckToggled))
         dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         dailyCheckCheckbox.frame = NSRect(x: 20, y: 50, width: 190, height: 22)
         card3.addSubview(dailyCheckCheckbox)
@@ -942,13 +944,13 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card3)
         
-        // ── Card 4: System Integration (y: 60, height: 78) ───────────
-        let card4 = createCardView(frame: NSRect(x: 24, y: 60, width: 552, height: 78))
+        // ── Card 4: Startup (y: 64, height: 78) ───────────
+        let card4 = createCardView(frame: NSRect(x: 24, y: 64, width: 552, height: 78))
         
-        let card4Title = createSectionHeader(title: "Automatic Startup", iconName: "power", frame: NSRect(x: 16, y: 44, width: 520, height: 22))
+        let card4Title = createSectionHeader(title: "Startup", iconName: "power", frame: NSRect(x: 16, y: 44, width: 520, height: 22))
         card4.addSubview(card4Title)
         
-        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "  Launch at Login", target: self, action: nil)
+        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "  Start at login", target: self, action: nil)
         launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         launchAtLoginCheckbox.frame = NSRect(x: 20, y: 14, width: 510, height: 22)
         card4.addSubview(launchAtLoginCheckbox)
@@ -1048,8 +1050,11 @@ class SettingsWindowController: NSWindowController {
         case 15: intervalPopUp.selectItem(at: 1)
         case 30: intervalPopUp.selectItem(at: 2)
         case 60: intervalPopUp.selectItem(at: 3)
+        case 120: intervalPopUp.selectItem(at: 4)
         case 240: intervalPopUp.selectItem(at: 5)
         case 360: intervalPopUp.selectItem(at: 6)
+        case 720: intervalPopUp.selectItem(at: 7)
+        case 1440: intervalPopUp.selectItem(at: 8)
         default: intervalPopUp.selectItem(at: 4)
         }
         
@@ -1078,13 +1083,7 @@ class SettingsWindowController: NSWindowController {
         
         let h = s.dailyCheckHour
         let m = s.dailyCheckMinute
-        var matchIdx = 20
-        for (idx, opt) in timeOptions.enumerated() {
-            if opt.hour == h && abs(opt.minute - m) < 15 {
-                matchIdx = idx
-                break
-            }
-        }
+        let matchIdx = timeOptions.firstIndex(where: { $0.hour == h && $0.minute == m }) ?? 0
         timePopUp.selectItem(at: matchIdx)
         
         let days = s.activeDays.count == 7 ? s.activeDays : [false, true, true, true, true, true, false]
@@ -1111,8 +1110,11 @@ class SettingsWindowController: NSWindowController {
         case 1: s.checkIntervalMinutes = 15
         case 2: s.checkIntervalMinutes = 30
         case 3: s.checkIntervalMinutes = 60
+        case 4: s.checkIntervalMinutes = 120
         case 5: s.checkIntervalMinutes = 240
         case 6: s.checkIntervalMinutes = 360
+        case 7: s.checkIntervalMinutes = 720
+        case 8: s.checkIntervalMinutes = 1440
         default: s.checkIntervalMinutes = 120
         }
         
