@@ -1,9 +1,10 @@
 import AppKit
 import Foundation
 import ServiceManagement
+import SwiftUI
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.0.6"
+let APP_VERSION = "2.0.7"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -15,6 +16,29 @@ let stateFile = appDir.appendingPathComponent("seen_jobs.json")
 let settingsFile = appDir.appendingPathComponent("settings.json")
 let dashboardFile = appDir.appendingPathComponent("dashboard.html")
 let logFile = appDir.appendingPathComponent("monitor.log")
+
+struct UpdateChangelogView: View {
+    let changelog: String
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            Text(changelog)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundColor(.primary)
+                .lineSpacing(3)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+        }
+        .frame(width: 340, height: 140)
+        .background(Color(NSColor.controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+        )
+    }
+}
 
 // ── Location Preset Items ──────────────────────────────────────────────────────
 struct LocationPreset {
@@ -1271,9 +1295,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func checkForUpdates(silentIfCurrent: Bool) {
-        guard let url = URL(string: VERSION_CHECK_URL) else { return }
+        URLCache.shared.removeAllCachedResponses()
+        let ts = Int(Date().timeIntervalSince1970)
+        let urlStr = VERSION_CHECK_URL.contains("?") ? "\(VERSION_CHECK_URL)&t=\(ts)" : "\(VERSION_CHECK_URL)?t=\(ts)"
+        guard let url = URL(string: urlStr) else { return }
         var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.addValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.addValue("no-cache", forHTTPHeaderField: "Pragma")
         
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
             guard let self = self else { return }
@@ -1289,10 +1318,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             
             var notes = ""
-            if let changelogs = json["changelog"] as? [[String: Any]],
-               let match = changelogs.first(where: { ($0["version"] as? String) == remoteVersion }),
-               let changes = match["changes"] as? [String] {
-                notes = changes.map { "• \($0)" }.joined(separator: "\n")
+            if let changelogs = json["changelog"] as? [[String: Any]] {
+                let unreadEntries = changelogs.filter { entry in
+                    if let v = entry["version"] as? String {
+                        return self.compareVersions(remote: v, current: APP_VERSION)
+                    }
+                    return false
+                }
+                notes = unreadEntries.compactMap { entry -> String? in
+                    guard let v = entry["version"] as? String,
+                          let changes = entry["changes"] as? [String] else { return nil }
+                    let changeList = changes.map { "• \($0)" }.joined(separator: "\n")
+                    return "Version \(v):\n\(changeList)"
+                }.joined(separator: "\n\n")
             }
             
             let isNewer = self.compareVersions(remote: remoteVersion, current: APP_VERSION)
@@ -1321,6 +1359,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func showUpdateAlert(remoteVersion: String?, changelog: String, isNewer: Bool) {
         let alert = NSAlert()
         alert.alertStyle = .informational
+        NSApp.activate(ignoringOtherApps: true)
         
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
@@ -1328,8 +1367,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         if isNewer, let ver = remoteVersion {
-            alert.messageText = " Update Available: Jobs Monitor v\(ver)"
-            alert.informativeText = "A new version of Jobs Monitor is available!\n\nWhat's New in v\(ver):\n\(changelog)\n\nClick \"Update Now\" to download and install automatically."
+            alert.messageText = "Jobs Monitor v\(ver) is available"
+            alert.informativeText = "You have v\(APP_VERSION). Here's what's new:"
+            if !changelog.isEmpty {
+                let hosting = NSHostingView(rootView: UpdateChangelogView(changelog: changelog))
+                hosting.frame = NSRect(x: 0, y: 0, width: 340, height: 140)
+                alert.accessoryView = hosting
+            }
             alert.addButton(withTitle: "Update Now")
             alert.addButton(withTitle: "Later")
             
@@ -1338,7 +1382,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 downloadAndInstallUpdate()
             }
         } else {
-            alert.messageText = " You're Up to Date!"
+            alert.messageText = "You're Up to Date!"
             alert.informativeText = "Jobs Monitor v\(APP_VERSION) is currently the latest version available."
             alert.addButton(withTitle: "OK")
             alert.runModal()

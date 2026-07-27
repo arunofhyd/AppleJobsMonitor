@@ -1,7 +1,16 @@
 {
-  "version": "2.0.6",
+  "version": "2.0.7",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.0.7",
+      "date": "2026-07-27",
+      "changes": [
+        "Smooth Update Window Scrolling: Introduced hardware-accelerated SwiftUI ScrollView changelog viewer for 60 FPS / 120 FPS ProMotion trackpad scrolling.",
+        "Real-Time Update Check: Purged URLCache and added cache-busting timestamp parameters for zero-delay update notifications.",
+        "Cumulative Release Notes: Update alert now parses and displays all unread changes since your current build."
+      ]
+    },
     {
       "version": "2.0.6",
       "date": "2026-07-27",
