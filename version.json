@@ -1,13 +1,15 @@
 {
-  "version": "2.0.5",
+  "version": "2.0.6",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
     {
-      "version": "2.0.5",
-      "date": "2026-07-26",
+      "version": "2.0.6",
+      "date": "2026-07-27",
       "changes": [
-        "Fixed Preferences window cards appearing white in Dark Mode.",
-        "Daily popup now fires on launch if the scheduled time was missed (laptop was off)."
+        "75+ notification sounds & ringtones with instant audio preview.",
+        "Automatic Startup section redesign with power icon and Launch at Login.",
+        "Pixel-perfect 14px card spacing and uniform header alignment.",
+        "Default notification sound updated to Bulletin."
       ]
     },
     {

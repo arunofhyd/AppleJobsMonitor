@@ -3,7 +3,7 @@ import Foundation
 import ServiceManagement
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.0.5"
+let APP_VERSION = "2.0.6"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -89,6 +89,139 @@ let cityPresets: [LocationPreset] = [
 
 let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
+struct SoundOption {
+    let title: String
+    let nameOrPath: String
+}
+
+let availableSounds: [SoundOption] = [
+    SoundOption(title: "None", nameOrPath: ""),
+    
+    // ── Classic macOS System Sounds ──────────────────────────────────────────
+    SoundOption(title: "Glass", nameOrPath: "Glass"),
+    SoundOption(title: "Ping", nameOrPath: "Ping"),
+    SoundOption(title: "Pop", nameOrPath: "Pop"),
+    SoundOption(title: "Blow", nameOrPath: "Blow"),
+    SoundOption(title: "Bottle", nameOrPath: "Bottle"),
+    SoundOption(title: "Frog", nameOrPath: "Frog"),
+    SoundOption(title: "Funk", nameOrPath: "Funk"),
+    SoundOption(title: "Hero", nameOrPath: "Hero"),
+    SoundOption(title: "Morse", nameOrPath: "Morse"),
+    SoundOption(title: "Purr", nameOrPath: "Purr"),
+    SoundOption(title: "Sosumi", nameOrPath: "Sosumi"),
+    SoundOption(title: "Submarine", nameOrPath: "Submarine"),
+    SoundOption(title: "Tink", nameOrPath: "Tink"),
+    SoundOption(title: "Basso", nameOrPath: "Basso"),
+    
+    // ── Modern iOS / macOS Alert Tones ────────────────────────────────────────
+    SoundOption(title: "Aurora", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Aurora.m4r"),
+    SoundOption(title: "Bamboo", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Bamboo.m4r"),
+    SoundOption(title: "Chord", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Chord.m4r"),
+    SoundOption(title: "Circles", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Circles.m4r"),
+    SoundOption(title: "Complete", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Complete.m4r"),
+    SoundOption(title: "Hello", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Hello.m4r"),
+    SoundOption(title: "Input", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Input.m4r"),
+    SoundOption(title: "Keys", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Keys.m4r"),
+    SoundOption(title: "Note", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Note.m4r"),
+    SoundOption(title: "Popcorn", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Popcorn.m4r"),
+    SoundOption(title: "Pulse", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Pulse.m4r"),
+    SoundOption(title: "Synth", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Modern/Synth.m4r"),
+
+    // ── Classic Apple Alert Tones ─────────────────────────────────────────────
+    SoundOption(title: "Tri-Tone", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Tri-Tone.m4r"),
+    SoundOption(title: "Alert", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Alert.m4r"),
+    SoundOption(title: "Anticipate", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Anticipate.m4r"),
+    SoundOption(title: "Bell", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Bell.m4r"),
+    SoundOption(title: "Bloom", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Bloom.m4r"),
+    SoundOption(title: "Calypso", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Calypso.m4r"),
+    SoundOption(title: "Chime", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Chime.m4r"),
+    SoundOption(title: "Choo Choo", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Choo Choo.m4r"),
+    SoundOption(title: "Descent", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Descent.m4r"),
+    SoundOption(title: "Ding", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Ding.m4r"),
+    SoundOption(title: "Electronic", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Electronic.m4r"),
+    SoundOption(title: "Fanfare", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Fanfare.m4r"),
+    SoundOption(title: "Horn", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Horn.m4r"),
+    SoundOption(title: "Ladder", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Ladder.m4r"),
+    SoundOption(title: "Minuet", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Minuet.m4r"),
+    SoundOption(title: "News Flash", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/News Flash.m4r"),
+    SoundOption(title: "Noir", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Noir.m4r"),
+    SoundOption(title: "Sherwood Forest", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Sherwood Forest.m4r"),
+    SoundOption(title: "Spell", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Spell.m4r"),
+    SoundOption(title: "Suspense", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Suspense.m4r"),
+    SoundOption(title: "Swish", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Swish.m4r"),
+    SoundOption(title: "Swoosh", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Swoosh.m4r"),
+    SoundOption(title: "Telegraph", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Telegraph.m4r"),
+    SoundOption(title: "Tiptoes", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Tiptoes.m4r"),
+    SoundOption(title: "Tweet", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Tweet.m4r"),
+    SoundOption(title: "Typewriters", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Typewriters.m4r"),
+    SoundOption(title: "Update", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/Classic/Update.m4r"),
+    
+    // ── Haptic & Expressive Tones ─────────────────────────────────────────────
+    SoundOption(title: "Droplet", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Droplet-EncoreInfinitum.caf"),
+    SoundOption(title: "Antic", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Antic-EncoreInfinitum.caf"),
+    SoundOption(title: "Cheers", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Cheers-EncoreInfinitum.caf"),
+    SoundOption(title: "Handoff", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Handoff-EncoreInfinitum.caf"),
+    SoundOption(title: "Milestone", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Milestone-EncoreInfinitum.caf"),
+    SoundOption(title: "Passage", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Passage-EncoreInfinitum.caf"),
+    SoundOption(title: "Portal", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Portal-EncoreInfinitum.caf"),
+    SoundOption(title: "Rattle", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Rattle-EncoreInfinitum.caf"),
+    SoundOption(title: "Rebound", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Rebound-EncoreInfinitum.caf"),
+    SoundOption(title: "Slide", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Slide-EncoreInfinitum.caf"),
+    SoundOption(title: "Welcome", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/AlertTones/EncoreInfinitum/Welcome-EncoreInfinitum.caf"),
+
+    // ── Iconic Ringtones ──────────────────────────────────────────────────────
+    SoundOption(title: "Reflection", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Reflection.m4r"),
+    SoundOption(title: "Radar", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Radar.m4r"),
+    SoundOption(title: "Apex", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Apex.m4r"),
+    SoundOption(title: "Beacon", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Beacon.m4r"),
+    SoundOption(title: "Bulletin", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Bulletin.m4r"),
+    SoundOption(title: "Chimes", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Chimes.m4r"),
+    SoundOption(title: "Circuit", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Circuit.m4r"),
+    SoundOption(title: "Constellation", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Constellation.m4r"),
+    SoundOption(title: "Cosmic", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Cosmic.m4r"),
+    SoundOption(title: "Crystals", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Crystals.m4r"),
+    SoundOption(title: "Hillside", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Hillside.m4r"),
+    SoundOption(title: "Illuminate", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Illuminate.m4r"),
+    SoundOption(title: "Marimba", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Marimba.m4r"),
+    SoundOption(title: "Night Owl", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Night Owl.m4r"),
+    SoundOption(title: "Opening", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Opening.m4r"),
+    SoundOption(title: "Playtime", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Playtime.m4r"),
+    SoundOption(title: "Radiate", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Radiate.m4r"),
+    SoundOption(title: "Ripples", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Ripples.m4r"),
+    SoundOption(title: "Sencha", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Sencha.m4r"),
+    SoundOption(title: "Signal", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Signal.m4r"),
+    SoundOption(title: "Silk", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Silk.m4r"),
+    SoundOption(title: "Slow Rise", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Slow Rise.m4r"),
+    SoundOption(title: "Stargaze", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Stargaze.m4r"),
+    SoundOption(title: "Summit", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Summit.m4r"),
+    SoundOption(title: "Twinkle", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Twinkle.m4r"),
+    SoundOption(title: "Uplift", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Uplift.m4r"),
+    SoundOption(title: "Waves", nameOrPath: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Waves.m4r")
+]
+
+private var activeSound: NSSound?
+
+func stopNotificationSound() {
+    activeSound?.stop()
+    activeSound = nil
+}
+
+func playNotificationSound(_ nameOrPath: String) {
+    stopNotificationSound()
+    guard !nameOrPath.isEmpty else { return }
+    if nameOrPath.hasPrefix("/") {
+        if let sound = NSSound(contentsOfFile: nameOrPath, byReference: true) {
+            activeSound = sound
+            sound.play()
+        }
+    } else {
+        if let sound = NSSound(named: NSSound.Name(nameOrPath)) {
+            activeSound = sound
+            sound.play()
+        }
+    }
+}
+
 let timeOptions: [(hour: Int, minute: Int, title: String)] = {
     var opts: [(Int, Int, String)] = []
     for h in 0..<24 {
@@ -111,6 +244,7 @@ struct AppSettings: Codable {
     var customUrl: String
     var checkIntervalMinutes: Int // 5, 15, 30, 60, 120, 240, 360
     var popupDismissSeconds: Int // 10, 30, 60, 180, 300, 600, 0
+    var notificationSound: String // system sound name, or "" for none
     var enableDailyCheck: Bool
     var dailyCheckHour: Int // 0..23
     var dailyCheckMinute: Int // 0..59
@@ -125,6 +259,7 @@ struct AppSettings: Codable {
             customUrl: "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest",
             checkIntervalMinutes: 120,
             popupDismissSeconds: 300,
+            notificationSound: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Bulletin.m4r",
             enableDailyCheck: true,
             dailyCheckHour: 10,
             dailyCheckMinute: 0,
@@ -621,6 +756,7 @@ class SettingsWindowController: NSWindowController {
     
     var intervalPopUp: NSPopUpButton!
     var dismissPopUp: NSPopUpButton!
+    var soundPopUp: NSPopUpButton!
     
     var dailyCheckCheckbox: NSButton!
     var timePopUp: NSPopUpButton!
@@ -632,7 +768,7 @@ class SettingsWindowController: NSWindowController {
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 630),
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 740),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -652,7 +788,7 @@ class SettingsWindowController: NSWindowController {
         guard let contentView = window?.contentView else { return }
         
         // ── Top Header Banner (Centralized Logo Only) ─────────────────
-        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 540, width: 600, height: 90))
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 650, width: 600, height: 90))
         
         let iconView = NSImageView(frame: NSRect(x: 268, y: 13, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -669,94 +805,109 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(headerView)
         
-        // ── Card 1: Target Location (y: 355, height: 170) ────────────
-        let card1 = createCardView(frame: NSRect(x: 24, y: 355, width: 552, height: 170))
+        // ── Card 1: Target Location (y: 470, height: 164) ────────────
+        let card1 = createCardView(frame: NSRect(x: 24, y: 470, width: 552, height: 164))
         
-        let card1Title = createSectionHeader(title: "Search Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 135, width: 520, height: 22))
+        let card1Title = createSectionHeader(title: "Search Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 128, width: 520, height: 22))
         card1.addSubview(card1Title)
         
-        radioCountry = NSButton(radioButtonWithTitle: "Country:", target: self, action: #selector(radioChanged))
+        radioCountry = NSButton(radioButtonWithTitle: "  Country:", target: self, action: #selector(radioChanged))
         radioCountry.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCountry.frame = NSRect(x: 20, y: 100, width: 140, height: 22)
+        radioCountry.frame = NSRect(x: 20, y: 92, width: 140, height: 22)
         radioCountry.tag = 0
         card1.addSubview(radioCountry)
         
-        countryPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 97, width: 365, height: 26))
+        countryPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 89, width: 365, height: 26))
         countryPopUp.addItems(withTitles: countryPresets.map { $0.name })
         card1.addSubview(countryPopUp)
         
-        radioCity = NSButton(radioButtonWithTitle: "City:", target: self, action: #selector(radioChanged))
+        radioCity = NSButton(radioButtonWithTitle: "  City:", target: self, action: #selector(radioChanged))
         radioCity.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCity.frame = NSRect(x: 20, y: 65, width: 140, height: 22)
+        radioCity.frame = NSRect(x: 20, y: 56, width: 140, height: 22)
         radioCity.tag = 1
         card1.addSubview(radioCity)
         
-        cityPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 62, width: 365, height: 26))
+        cityPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 53, width: 365, height: 26))
         cityPopUp.addItems(withTitles: cityPresets.map { $0.name })
         card1.addSubview(cityPopUp)
         
-        radioCustom = NSButton(radioButtonWithTitle: "Custom URL:", target: self, action: #selector(radioChanged))
+        radioCustom = NSButton(radioButtonWithTitle: "  Custom URL:", target: self, action: #selector(radioChanged))
         radioCustom.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCustom.frame = NSRect(x: 20, y: 30, width: 140, height: 22)
+        radioCustom.frame = NSRect(x: 20, y: 20, width: 140, height: 22)
         radioCustom.tag = 2
         card1.addSubview(radioCustom)
         
-        customUrlField = NSTextField(frame: NSRect(x: 165, y: 28, width: 365, height: 24))
+        customUrlField = NSTextField(frame: NSRect(x: 165, y: 18, width: 365, height: 24))
         customUrlField.placeholderString = "https://jobs.apple.com/en-us/search?..."
         card1.addSubview(customUrlField)
         
         contentView.addSubview(card1)
         
-        // ── Card 2: Frequency & Alerts (y: 230, height: 110) ─────────
-        let card2 = createCardView(frame: NSRect(x: 24, y: 230, width: 552, height: 110))
+        // ── Card 2: Frequency & Alerts (y: 290, height: 164) ─────────
+        let card2 = createCardView(frame: NSRect(x: 24, y: 290, width: 552, height: 164))
         
-        let card2Title = createSectionHeader(title: "Check Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 75, width: 520, height: 22))
+        let card2Title = createSectionHeader(title: "Check Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 128, width: 520, height: 22))
         card2.addSubview(card2Title)
         
         let intervalLabel = NSTextField(labelWithString: "Check Interval:")
         intervalLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        intervalLabel.frame = NSRect(x: 20, y: 44, width: 220, height: 20)
+        intervalLabel.frame = NSRect(x: 20, y: 94, width: 220, height: 20)
         card2.addSubview(intervalLabel)
         
-        intervalPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 41, width: 285, height: 26))
+        intervalPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 91, width: 285, height: 26))
         intervalPopUp.addItems(withTitles: ["5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "6 Hours"])
         card2.addSubview(intervalPopUp)
         
         let dismissLabel = NSTextField(labelWithString: "Auto-Dismiss Popup:")
         dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        dismissLabel.frame = NSRect(x: 20, y: 12, width: 220, height: 20)
+        dismissLabel.frame = NSRect(x: 20, y: 58, width: 220, height: 20)
         card2.addSubview(dismissLabel)
         
-        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 9, width: 285, height: 26))
+        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 55, width: 285, height: 26))
         dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
         card2.addSubview(dismissPopUp)
         
+        let soundLabel = NSTextField(labelWithString: "Notification Sound:")
+        soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        soundLabel.frame = NSRect(x: 20, y: 22, width: 220, height: 20)
+        card2.addSubview(soundLabel)
+        
+        soundPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 19, width: 225, height: 26))
+        soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
+        card2.addSubview(soundPopUp)
+        
+        let previewBtn = NSButton(title: "▶", target: self, action: #selector(previewSound))
+        previewBtn.frame = NSRect(x: 476, y: 19, width: 54, height: 26)
+        previewBtn.bezelStyle = .rounded
+        previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        card2.addSubview(previewBtn)
+        
         contentView.addSubview(card2)
         
-        // ── Card 3: Daily Digest Schedule (y: 110, height: 105) ──────
-        let card3 = createCardView(frame: NSRect(x: 24, y: 110, width: 552, height: 105))
+        // ── Card 3: Daily Digest Schedule (y: 154, height: 120) ──────
+        let card3 = createCardView(frame: NSRect(x: 24, y: 154, width: 552, height: 120))
         
-        let card3Title = createSectionHeader(title: "Daily Popup", iconName: "calendar", frame: NSRect(x: 16, y: 72, width: 520, height: 22))
+        let card3Title = createSectionHeader(title: "Daily Popup", iconName: "calendar", frame: NSRect(x: 16, y: 84, width: 520, height: 22))
         card3.addSubview(card3Title)
         
-        dailyCheckCheckbox = NSButton(checkboxWithTitle: "Show Daily Popup at:", target: self, action: #selector(dailyCheckToggled))
+        dailyCheckCheckbox = NSButton(checkboxWithTitle: "  Show Daily Popup at:", target: self, action: #selector(dailyCheckToggled))
         dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        dailyCheckCheckbox.frame = NSRect(x: 20, y: 40, width: 175, height: 22)
+        dailyCheckCheckbox.frame = NSRect(x: 20, y: 50, width: 190, height: 22)
         card3.addSubview(dailyCheckCheckbox)
         
-        timePopUp = NSPopUpButton(frame: NSRect(x: 200, y: 37, width: 330, height: 26))
+        timePopUp = NSPopUpButton(frame: NSRect(x: 215, y: 47, width: 315, height: 26))
         timePopUp.addItems(withTitles: timeOptions.map { $0.title })
         card3.addSubview(timePopUp)
         
-        let startX: CGFloat = 200
-        let totalW: CGFloat = 330.0
+        let startX: CGFloat = 215
+        let totalW: CGFloat = 315.0
         let spacing: CGFloat = 4.0
         let btnWidth: CGFloat = (totalW - 6.0 * spacing) / 7.0
         
         for (idx, dName) in dayNames.enumerated() {
             let btnX = startX + CGFloat(idx) * (btnWidth + spacing)
             let btn = NSButton(title: dName, target: self, action: #selector(dayButtonToggled))
-            btn.frame = NSRect(x: btnX, y: 8, width: btnWidth, height: 24)
+            btn.frame = NSRect(x: btnX, y: 14, width: btnWidth, height: 24)
             btn.setButtonType(.pushOnPushOff)
             btn.bezelStyle = .recessed
             btn.font = NSFont.systemFont(ofSize: 11, weight: .regular)
@@ -767,12 +918,15 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card3)
         
-        // ── Card 4: System Integration (y: 58, height: 42) ───────────
-        let card4 = createCardView(frame: NSRect(x: 24, y: 58, width: 552, height: 42))
+        // ── Card 4: System Integration (y: 60, height: 78) ───────────
+        let card4 = createCardView(frame: NSRect(x: 24, y: 60, width: 552, height: 78))
         
-        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at Login", target: self, action: nil)
+        let card4Title = createSectionHeader(title: "Automatic Startup", iconName: "power", frame: NSRect(x: 16, y: 44, width: 520, height: 22))
+        card4.addSubview(card4Title)
+        
+        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "  Launch at Login", target: self, action: nil)
         launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        launchAtLoginCheckbox.frame = NSRect(x: 16, y: 10, width: 520, height: 22)
+        launchAtLoginCheckbox.frame = NSRect(x: 20, y: 14, width: 510, height: 22)
         card4.addSubview(launchAtLoginCheckbox)
         
         contentView.addSubview(card4)
@@ -797,19 +951,34 @@ class SettingsWindowController: NSWindowController {
 
     func createSectionHeader(title: String, iconName: String, frame: NSRect) -> NSView {
         let header = NSView(frame: frame)
-        let iconView = NSImageView(frame: NSRect(x: 0, y: 1, width: 18, height: 18))
-        iconView.image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)
+        
+        let iconSize: CGFloat = 16.0
+        let iconY: CGFloat = (frame.height - iconSize) / 2.0
+        let iconView = NSImageView(frame: NSRect(x: 0, y: iconY, width: iconSize, height: iconSize))
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        let img = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) ?? NSImage(systemSymbolName: "gearshape.fill", accessibilityDescription: nil)
+        iconView.image = img
         iconView.contentTintColor = .labelColor
         header.addSubview(iconView)
         
+        let labelHeight: CGFloat = 18.0
+        let labelY: CGFloat = (frame.height - labelHeight) / 2.0
         let label = NSTextField(labelWithString: title)
         label.font = NSFont.systemFont(ofSize: 13, weight: .bold)
-        label.frame = NSRect(x: 24, y: 0, width: frame.width - 24, height: 20)
+        label.frame = NSRect(x: 24, y: labelY, width: frame.width - 24, height: labelHeight)
         header.addSubview(label)
         return header
     }
 
+    @objc func previewSound() {
+        let idx = soundPopUp.indexOfSelectedItem
+        if idx >= 0 && idx < availableSounds.count {
+            playNotificationSound(availableSounds[idx].nameOrPath)
+        }
+    }
+    
     @objc func cancelClicked() {
+        stopNotificationSound()
         window?.close()
     }
     
@@ -870,6 +1039,16 @@ class SettingsWindowController: NSWindowController {
         default: dismissPopUp.selectItem(at: 4)
         }
         
+        // Notification Sound
+        let savedSound = s.notificationSound
+        if let idx = availableSounds.firstIndex(where: { $0.nameOrPath == savedSound || $0.title == savedSound }) {
+            soundPopUp.selectItem(at: idx)
+        } else if let bulletinIdx = availableSounds.firstIndex(where: { $0.title == "Bulletin" }) {
+            soundPopUp.selectItem(at: bulletinIdx)
+        } else {
+            soundPopUp.selectItem(at: 1)
+        }
+        
         dailyCheckCheckbox.state = s.enableDailyCheck ? .on : .off
         timePopUp.isEnabled = s.enableDailyCheck
         
@@ -923,6 +1102,12 @@ class SettingsWindowController: NSWindowController {
         default: s.popupDismissSeconds = 300
         }
         
+        // Notification Sound
+        let selectedSoundIdx = soundPopUp.indexOfSelectedItem
+        if selectedSoundIdx >= 0 && selectedSoundIdx < availableSounds.count {
+            s.notificationSound = availableSounds[selectedSoundIdx].nameOrPath
+        }
+        
         s.enableDailyCheck = (dailyCheckCheckbox.state == .on)
         let selectedTimeOpt = timeOptions[max(0, min(timePopUp.indexOfSelectedItem, timeOptions.count - 1))]
         s.dailyCheckHour = selectedTimeOpt.hour
@@ -933,6 +1118,7 @@ class SettingsWindowController: NSWindowController {
         s.launchAtLogin = launchLogin
         configureLaunchAtLogin(enabled: launchLogin)
         
+        stopNotificationSound()
         saveSettings(s)
         window?.close()
         onSave?()
@@ -1402,6 +1588,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func showNativeAlert(title: String, message: String) {
+        // Play notification sound
+        let settings = loadSettings()
+        playNotificationSound(settings.notificationSound)
+        
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
@@ -1414,7 +1604,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.icon = img
         }
         
-        let settings = loadSettings()
+        
         if settings.popupDismissSeconds > 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(settings.popupDismissSeconds)) {
                 if let window = alert.window.sheetParent ?? NSApp.windows.first(where: { $0.title == title }) {
