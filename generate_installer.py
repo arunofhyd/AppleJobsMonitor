@@ -169,6 +169,7 @@ cat << EOF > "$CONTENTS_DIR/Info.plist"
 </dict>
 </plist>
 EOF
+codesign --force --deep --sign - --requirements '=designated => identifier "'"$PLIST_LABEL"'"' "$TARGET_APP" >/dev/null 2>&1 || true
 ok "App bundle created."
 printf "\\n"
 
