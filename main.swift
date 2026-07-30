@@ -5,7 +5,7 @@ import SwiftUI
 import UserNotifications
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.1.0"
+let APP_VERSION = "2.1.1"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -1379,6 +1379,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             UserDefaults.standard.set(true, forKey: firstLaunchKey)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.openPreferences()
+            }
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+                NSWorkspace.shared.open(url)
             }
         }
     }
