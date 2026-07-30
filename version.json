@@ -1,12 +1,14 @@
 {
-  "version": "2.1.1",
+  "version": "2.1.2",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
     {
-      "version": "2.1.1",
+      "version": "2.1.2",
       "date": "2026-07-30",
       "changes": [
-        "Automatically open Notification settings on first launch."
+        "Automatically open Jobs Monitor Notification settings on first launch.",
+        "Installer now directly downloads the latest source code instead of using base64 encoding.",
+        "Fixed an issue where the sitemap was not automatically updating."
       ]
     },
     {
