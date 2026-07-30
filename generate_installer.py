@@ -70,18 +70,90 @@ printf "\\n"
 
 # ---- Step 1: Command Line Tools (compiler) -------------------------------
 step "Checking for build tools…"
-if ! command -v swiftc &> /dev/null; then
+if ! xcode-select -p >/dev/null 2>&1; then
     warn "Apple's Command Line Tools are needed to build the app."
     printf "  ${{GREY}}A small official Apple installer will pop up. Please click ${{BOLD}}Install${{NC}}${{GREY}} and wait for it to finish.${{NC}}\\n\\n"
     xcode-select --install >/dev/null 2>&1
     printf "  ${{YELLOW}}When the installation is COMPLETE, press [Enter] here to continue…${{NC}}"
     read -r
-    if ! command -v swiftc &> /dev/null; then
-        fail "Build tools still not found."
-        printf "  ${{GREY}}Please finish the Apple installer, then run this file again.${{NC}}\\n\\n"
-        exit 1
+    while ! xcode-select -p >/dev/null 2>&1; do
+        printf "  ${{GREY}}Waiting for Command Line Tools installation to finish…${{NC}}\\n"
+        sleep 5
+    done
+fi
+
+# ---- Workaround for CLT "redefinition of module 'SwiftBridging'" bug ------
+_CLT_SWIFT="/Library/Developer/CommandLineTools/usr/include/swift"
+_CLT_MODMAP="$_CLT_SWIFT/module.modulemap"
+_CLT_BRIDGE="$_CLT_SWIFT/bridging.modulemap"
+
+_NEED_BRIDGING_FIX=false
+if [ -f "$_CLT_MODMAP" ] && [ -f "$_CLT_BRIDGE" ] && \
+   grep -q "module SwiftBridging" "$_CLT_MODMAP" 2>/dev/null && \
+   grep -q "module SwiftBridging" "$_CLT_BRIDGE" 2>/dev/null; then
+    _NEED_BRIDGING_FIX=true
+fi
+
+if [ "$_NEED_BRIDGING_FIX" = true ]; then
+    warn "Known compiler bug detected (SwiftBridging module conflict)."
+
+    _XCODE_DEV=""
+    for _candidate in \
+        "/Applications/Xcode.app/Contents/Developer" \
+        "/Applications/Xcode-beta.app/Contents/Developer" \
+        "/Applications/Xcode_*.app/Contents/Developer"; do
+        for _path in $_candidate; do
+            if [ -d "${{_path}}/Toolchains/XcodeDefault.xctoolchain" ]; then
+                _XCODE_DEV="${{_path}}"
+                break 2
+            fi
+        done
+    done
+
+    if [ -n "$_XCODE_DEV" ]; then
+        printf "  ${{GREY}}Using Xcode toolchain at ${{_XCODE_DEV}}${{NC}}\\n"
+        export DEVELOPER_DIR="${{_XCODE_DEV}}"
+    else
+        printf "  ${{GREY}}No Xcode installation found. Attempting one-time compiler repair…${{NC}}\\n"
+        printf "  ${{YELLOW}}Your admin password may be required:${{NC}}\\n"
+
+        _PATCHED="/tmp/module.modulemap.patched"
+        python3 -c "
+import re, sys
+try:
+    with open('$_CLT_MODMAP', 'r') as f:
+        content = f.read()
+    patched = re.sub(r'module\\s+SwiftBridging\\s*\\{{[^}}]*\\}}', '', content)
+    with open('$_PATCHED', 'w') as f:
+        f.write(patched)
+    sys.exit(0)
+except Exception as e:
+    sys.exit(1)
+" 2>/dev/null
+
+        if [ -f "$_PATCHED" ]; then
+            if sudo cp "$_CLT_MODMAP" "${{_CLT_MODMAP}}.bak" 2>/dev/null && \
+               sudo cp "$_PATCHED"    "$_CLT_MODMAP"        2>/dev/null; then
+                ok "Compiler repaired (removed duplicate SwiftBridging from module.modulemap)."
+            else
+                fail "Could not auto-repair (sudo required). Please run this manually, then re-run this installer:"
+                printf "\\n"
+                printf "  ${{BOLD}}  sudo cp '$_CLT_MODMAP' '${{_CLT_MODMAP}}.bak'${{NC}}\\n"
+                printf "  ${{BOLD}}  sudo cp '$_PATCHED' '$_CLT_MODMAP'${{NC}}\\n\\n"
+                printf "  ${{GREY}}Or reinstall Command Line Tools cleanly:${{NC}}\\n"
+                printf "  ${{BOLD}}  sudo rm -rf /Library/Developer/CommandLineTools${{NC}}\\n"
+                printf "  ${{BOLD}}  xcode-select --install${{NC}}\\n\\n"
+                exit 1
+            fi
+        else
+            fail "Could not prepare patch. Please reinstall Command Line Tools:"
+            printf "  ${{BOLD}}  sudo rm -rf /Library/Developer/CommandLineTools${{NC}}\\n"
+            printf "  ${{BOLD}}  xcode-select --install${{NC}}\\n\\n"
+            exit 1
+        fi
     fi
 fi
+
 ok "Build tools ready."
 printf "\\n"
 
@@ -98,11 +170,18 @@ printf "\\n"
 
 # ---- Step 3: Compiling the app -------------------------------------------
 step "Compiling Jobs Monitor…"
-if ! swiftc -O "$BUILD_DIR/main.swift" -o "$BUILD_DIR/$APP_NAME" -framework AppKit -framework ServiceManagement 2>/dev/null; then
+COMPILE_ERR="$(mktemp)"
+if ! swiftc -O "$BUILD_DIR/main.swift" -o "$BUILD_DIR/$APP_NAME" -framework AppKit -framework ServiceManagement -framework UserNotifications -framework SwiftUI -framework Foundation 2>"$COMPILE_ERR"; then
     fail "Could not compile the application."
-    printf "  ${{GREY}}Please check your system environment and try again.${{NC}}\\n\\n"
+    if [ -s "$COMPILE_ERR" ]; then
+        printf "  ${{GREY}}Compiler Error:${{NC}}\\n"
+        cat "$COMPILE_ERR" | sed 's/^/    /'
+    fi
+    rm -f "$COMPILE_ERR"
+    printf "\\n  ${{GREY}}Please verify Xcode Command Line Tools are active (run 'xcode-select --install' or 'sudo xcode-select -reset').${{NC}}\\n\\n"
     exit 1
 fi
+rm -f "$COMPILE_ERR"
 ok "App compiled successfully."
 printf "\\n"
 

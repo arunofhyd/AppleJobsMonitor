@@ -2,9 +2,10 @@ import AppKit
 import Foundation
 import ServiceManagement
 import SwiftUI
+import UserNotifications
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.0.9"
+let APP_VERSION = "2.1.0"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -269,11 +270,49 @@ struct AppSettings: Codable {
     var checkIntervalMinutes: Int // 5, 15, 30, 60, 120, 240, 360, 720, 1440
     var popupDismissSeconds: Int // 10, 30, 60, 180, 300, 600, 0
     var notificationSound: String // system sound name, or "" for none
+    var notificationStyle: Int // 0: System Side Notification (Banner), 1: Mid-Screen Window (Popup Alert - Default)
     var enableDailyCheck: Bool
     var dailyCheckHour: Int // 0..23
     var dailyCheckMinute: Int // 0..59
     var activeDays: [Bool] // 7 booleans for [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
     var launchAtLogin: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case locationMode, countryIndex, cityIndex, customUrl, checkIntervalMinutes, popupDismissSeconds, notificationSound, notificationStyle, enableDailyCheck, dailyCheckHour, dailyCheckMinute, activeDays, launchAtLogin
+    }
+    
+    init(locationMode: Int, countryIndex: Int, cityIndex: Int, customUrl: String, checkIntervalMinutes: Int, popupDismissSeconds: Int, notificationSound: String, notificationStyle: Int = 1, enableDailyCheck: Bool, dailyCheckHour: Int, dailyCheckMinute: Int, activeDays: [Bool], launchAtLogin: Bool) {
+        self.locationMode = locationMode
+        self.countryIndex = countryIndex
+        self.cityIndex = cityIndex
+        self.customUrl = customUrl
+        self.checkIntervalMinutes = checkIntervalMinutes
+        self.popupDismissSeconds = popupDismissSeconds
+        self.notificationSound = notificationSound
+        self.notificationStyle = notificationStyle
+        self.enableDailyCheck = enableDailyCheck
+        self.dailyCheckHour = dailyCheckHour
+        self.dailyCheckMinute = dailyCheckMinute
+        self.activeDays = activeDays
+        self.launchAtLogin = launchAtLogin
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        locationMode = try container.decodeIfPresent(Int.self, forKey: .locationMode) ?? 0
+        countryIndex = try container.decodeIfPresent(Int.self, forKey: .countryIndex) ?? 0
+        cityIndex = try container.decodeIfPresent(Int.self, forKey: .cityIndex) ?? 0
+        customUrl = try container.decodeIfPresent(String.self, forKey: .customUrl) ?? "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest"
+        checkIntervalMinutes = try container.decodeIfPresent(Int.self, forKey: .checkIntervalMinutes) ?? 120
+        popupDismissSeconds = try container.decodeIfPresent(Int.self, forKey: .popupDismissSeconds) ?? 300
+        notificationSound = try container.decodeIfPresent(String.self, forKey: .notificationSound) ?? "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Bulletin.m4r"
+        notificationStyle = try container.decodeIfPresent(Int.self, forKey: .notificationStyle) ?? 1
+        enableDailyCheck = try container.decodeIfPresent(Bool.self, forKey: .enableDailyCheck) ?? true
+        dailyCheckHour = try container.decodeIfPresent(Int.self, forKey: .dailyCheckHour) ?? 10
+        dailyCheckMinute = try container.decodeIfPresent(Int.self, forKey: .dailyCheckMinute) ?? 0
+        activeDays = try container.decodeIfPresent([Bool].self, forKey: .activeDays) ?? [false, true, true, true, true, true, false]
+        launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? true
+    }
     
     static var defaultConfig: AppSettings {
         return AppSettings(
@@ -284,6 +323,7 @@ struct AppSettings: Codable {
             checkIntervalMinutes: 120,
             popupDismissSeconds: 300,
             notificationSound: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Bulletin.m4r",
+            notificationStyle: 1,
             enableDailyCheck: true,
             dailyCheckHour: 10,
             dailyCheckMinute: 0,
@@ -460,6 +500,8 @@ struct JobItem: Codable {
     let location: String
     let posted: String
     let url: String
+    var countries: [String]? = []
+    var cities: [String]? = []
 }
 
 struct StateData: Codable {
@@ -591,8 +633,8 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, 
 }
 
 // ── HTML Parser ────────────────────────────────────────────────────────────────
-func parseJobsFromHTML(_ html: String, defaultSearchUrl: String) -> [JobItem] {
-    var results: [JobItem] = []
+func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSettings) -> [JobItem] {
+    var rawResults: [JobItem] = []
     
     let marker = "window.__staticRouterHydrationData = JSON.parse(\""
     if let range = html.range(of: marker) {
@@ -612,10 +654,10 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String) -> [JobItem] {
                         if let rolesList = roles {
                             for r in rolesList {
                                 if let item = normalizeJob(r, defaultUrl: defaultSearchUrl) {
-                                    results.append(item)
+                                    rawResults.append(item)
                                 }
                             }
-                            if !results.isEmpty { return results }
+                            if !rawResults.isEmpty { break }
                         }
                     }
                 }
@@ -623,7 +665,38 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String) -> [JobItem] {
         }
     }
     
-    return results
+    // ── Location Intelligence Filter ──────────────────────────────────
+    if settings.locationMode == 0 {
+        // Country Mode (e.g. India)
+        let idx = max(0, min(settings.countryIndex, countryPresets.count - 1))
+        let targetCountry = countryPresets[idx].name.lowercased()
+        let targetCode = countryPresets[idx].code.lowercased()
+        
+        let filtered = rawResults.filter { job in
+            let locLower = job.location.lowercased()
+            let cList = (job.countries ?? []).map { $0.lowercased() }
+            if cList.contains(where: { $0.contains(targetCountry) || targetCountry.contains($0) }) { return true }
+            if locLower.contains(targetCountry) { return true }
+            if targetCountry == "india" && (locLower.contains("india") || cList.contains(where: { $0.contains("ind") })) { return true }
+            if targetCode.contains("usa") && (locLower.contains("united states") || locLower.contains("usa")) { return true }
+            if targetCode.contains("gbr") && (locLower.contains("united kingdom") || locLower.contains("uk")) { return true }
+            return false
+        }
+        return filtered.isEmpty ? rawResults : filtered
+    } else if settings.locationMode == 1 {
+        // City Mode (e.g. Bengaluru)
+        let idx = max(0, min(settings.cityIndex, cityPresets.count - 1))
+        let targetCity = cityPresets[idx].name.lowercased()
+        
+        let filtered = rawResults.filter { job in
+            let locLower = job.location.lowercased()
+            let cList = (job.cities ?? []).map { $0.lowercased() }
+            return cList.contains(where: { $0.contains(targetCity) || targetCity.contains($0) }) || locLower.contains(targetCity)
+        }
+        return filtered.isEmpty ? rawResults : filtered
+    }
+    
+    return rawResults
 }
 
 func normalizeJob(_ raw: [String: Any], defaultUrl: String) -> JobItem? {
@@ -639,18 +712,34 @@ func normalizeJob(_ raw: [String: Any], defaultUrl: String) -> JobItem? {
         teamStr = t
     }
     
-    var locStr = "India"
-    if let locs = raw["locations"] as? [[String: Any]], let firstLoc = locs.first {
-        let city = (firstLoc["city"] as? String) ?? ""
-        let country = (firstLoc["countryName"] as? String) ?? (firstLoc["countryCode"] as? String) ?? ""
-        if !city.isEmpty { locStr = "\(city), \(country)" }
-        else if let n = firstLoc["name"] as? String, !n.isEmpty { locStr = n }
+    var locStr = ""
+    var extractedCountries: [String] = []
+    var extractedCities: [String] = []
+    
+    if let locs = raw["locations"] as? [[String: Any]] {
+        for loc in locs {
+            let city = (loc["city"] as? String) ?? ""
+            let country = (loc["countryName"] as? String) ?? (loc["countryCode"] as? String) ?? ""
+            let name = (loc["name"] as? String) ?? ""
+            
+            if !country.isEmpty { extractedCountries.append(country) }
+            if !city.isEmpty { extractedCities.append(city) }
+            if !name.isEmpty { extractedCountries.append(name) }
+            
+            if locStr.isEmpty {
+                if !city.isEmpty && !country.isEmpty { locStr = "\(city), \(country)" }
+                else if !city.isEmpty { locStr = city }
+                else if !name.isEmpty { locStr = name }
+                else if !country.isEmpty { locStr = country }
+            }
+        }
     }
+    if locStr.isEmpty { locStr = "Apple" }
     
     let posted = (raw["postingDate"] as? String) ?? (raw["datePosted"] as? String) ?? ""
     let url = "https://jobs.apple.com/en-us/details/\(pid)"
     
-    return JobItem(id: pid, title: title, team: teamStr, location: locStr, posted: posted, url: url)
+    return JobItem(id: pid, title: title, team: teamStr, location: locStr, posted: posted, url: url, countries: extractedCountries, cities: extractedCities)
 }
 
 // ── ClipLocal-Style Native About Window ─────────────────────────────────────────
@@ -711,11 +800,6 @@ class AboutWindowController: NSWindowController {
         contentView.addSubview(openSourceLabel)
         
         // Action Buttons
-        // let ghBtn = NSButton(title: "GitHub Repository ↗", target: self, action: #selector(openGitHub))
-        // ghBtn.frame = NSRect(x: 65, y: 30, width: 140, height: 32)
-        // ghBtn.bezelStyle = .rounded
-        // contentView.addSubview(ghBtn)
-        
         let contactBtn = NSButton(title: "Contact Developer", target: self, action: #selector(openContact))
         contactBtn.frame = NSRect(x: 130, y: 30, width: 160, height: 32)
         contactBtn.bezelStyle = .rounded
@@ -777,8 +861,11 @@ class SettingsWindowController: NSWindowController {
     
     var radioCustom: NSButton!
     var customUrlField: NSTextField!
+    var customUrlInstructionsBtn: NSButton!
     
     var intervalPopUp: NSPopUpButton!
+    var notificationStylePopUp: NSPopUpButton!
+    var notificationStyleInfoBtn: NSButton!
     var dismissPopUp: NSPopUpButton!
     var soundPopUp: NSPopUpButton!
     
@@ -790,9 +877,9 @@ class SettingsWindowController: NSWindowController {
     
     var onSave: (() -> Void)?
     
-    convenience init() {
+        convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 750),
+            contentRect: NSRect(x: 0, y: 0, width: 660, height: 775),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -813,9 +900,9 @@ class SettingsWindowController: NSWindowController {
         guard let contentView = window?.contentView else { return }
         
         // ── Top Header Banner (Centralized Logo Only) ─────────────────
-        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 660, width: 600, height: 90))
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 685, width: 660, height: 90))
         
-        let iconView = NSImageView(frame: NSRect(x: 268, y: 13, width: 64, height: 64))
+        let iconView = NSImageView(frame: NSRect(x: 298, y: 13, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
             iconView.image = img
@@ -824,117 +911,99 @@ class SettingsWindowController: NSWindowController {
         }
         headerView.addSubview(iconView)
         
-        let headerSep = NSBox(frame: NSRect(x: 0, y: 0, width: 600, height: 1))
+        let headerSep = NSBox(frame: NSRect(x: 0, y: 0, width: 660, height: 1))
         headerSep.boxType = .separator
         headerView.addSubview(headerSep)
         
         contentView.addSubview(headerView)
         
-        // ── Card 1: Target Location (y: 480, height: 164) ────────────
-        let card1 = createCardView(frame: NSRect(x: 24, y: 480, width: 552, height: 164))
+        // ── Card 1: Target Location (y: 510, height: 165) ────────────
+        let card1 = createCardView(frame: NSRect(x: 24, y: 510, width: 612, height: 165))
         
-        let card1Title = createSectionHeader(title: "Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 128, width: 520, height: 22))
+        let card1Title = createSectionHeader(title: "Target Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 132, width: 580, height: 22))
         card1.addSubview(card1Title)
         
-        radioCountry = NSButton(radioButtonWithTitle: "  Country", target: self, action: #selector(radioChanged))
+        radioCountry = NSButton(radioButtonWithTitle: "Country", target: self, action: #selector(radioChanged))
         radioCountry.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCountry.frame = NSRect(x: 20, y: 92, width: 140, height: 22)
+        radioCountry.frame = NSRect(x: 20, y: 94, width: 150, height: 22)
         radioCountry.tag = 0
         card1.addSubview(radioCountry)
         
-        countryPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 89, width: 365, height: 26))
+        countryPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 91, width: 420, height: 26))
         countryPopUp.addItems(withTitles: countryPresets.map { $0.name })
         card1.addSubview(countryPopUp)
         
-        radioCity = NSButton(radioButtonWithTitle: "  City", target: self, action: #selector(radioChanged))
+        radioCity = NSButton(radioButtonWithTitle: "City", target: self, action: #selector(radioChanged))
         radioCity.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCity.frame = NSRect(x: 20, y: 56, width: 140, height: 22)
+        radioCity.frame = NSRect(x: 20, y: 56, width: 150, height: 22)
         radioCity.tag = 1
         card1.addSubview(radioCity)
         
-        cityPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 53, width: 365, height: 26))
+        cityPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 53, width: 420, height: 26))
         cityPopUp.addItems(withTitles: cityPresets.map { $0.name })
         card1.addSubview(cityPopUp)
         
-        radioCustom = NSButton(radioButtonWithTitle: "  Custom URL", target: self, action: #selector(radioChanged))
+        radioCustom = NSButton(radioButtonWithTitle: "Custom URL", target: self, action: #selector(radioChanged))
         radioCustom.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCustom.frame = NSRect(x: 20, y: 20, width: 140, height: 22)
+        radioCustom.frame = NSRect(x: 20, y: 18, width: 150, height: 22)
         radioCustom.tag = 2
         card1.addSubview(radioCustom)
         
-        customUrlField = NSTextField(frame: NSRect(x: 165, y: 18, width: 365, height: 24))
-        customUrlField.placeholderString = "https://jobs.apple.com/en-us/search?..."
+        customUrlField = NSTextField(frame: NSRect(x: 185, y: 16, width: 376, height: 26))
+        customUrlField.placeholderString = "https://jobs.apple.com/en-us/search?search=Python&location=india-INDC"
+        customUrlField.font = NSFont.systemFont(ofSize: 12)
         card1.addSubview(customUrlField)
+        
+        customUrlInstructionsBtn = NSButton(title: "?", target: self, action: #selector(showCustomUrlInstructions))
+        customUrlInstructionsBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
+        customUrlInstructionsBtn.bezelStyle = .rounded
+        customUrlInstructionsBtn.frame = NSRect(x: 567, y: 15, width: 38, height: 26)
+        customUrlInstructionsBtn.toolTip = "How to use Custom Search URLs"
+        card1.addSubview(customUrlInstructionsBtn)
         
         contentView.addSubview(card1)
         
-        // ── Card 2: Refresh Frequency (y: 374, height: 90) ─────────
-        let card2 = createCardView(frame: NSRect(x: 24, y: 374, width: 552, height: 90))
+        // ── Card 2: Refresh Frequency (y: 410, height: 85) ─────────
+        let card2 = createCardView(frame: NSRect(x: 24, y: 410, width: 612, height: 85))
         
-        let card2Title = createSectionHeader(title: "Refresh Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 54, width: 520, height: 22))
+        let card2Title = createSectionHeader(title: "Refresh Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 52, width: 580, height: 22))
         card2.addSubview(card2Title)
         
         let intervalLabel = NSTextField(labelWithString: "Check for new jobs every")
         intervalLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        intervalLabel.frame = NSRect(x: 20, y: 20, width: 220, height: 20)
+        intervalLabel.frame = NSRect(x: 20, y: 18, width: 155, height: 20)
         card2.addSubview(intervalLabel)
         
-        intervalPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 17, width: 285, height: 26))
+        intervalPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 15, width: 420, height: 26))
         intervalPopUp.addItems(withTitles: ["5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "6 Hours", "12 Hours", "24 Hours"])
         card2.addSubview(intervalPopUp)
         
         contentView.addSubview(card2)
         
-        // ── Card 3: Alerts & Notifications (y: 158, height: 200) ──────
-        let card3 = createCardView(frame: NSRect(x: 24, y: 158, width: 552, height: 200))
+        // ── Card 3: Daily Summary (y: 260, height: 135) ─────────────
+        let card3 = createCardView(frame: NSRect(x: 24, y: 260, width: 612, height: 135))
         
-        let card3Title = createSectionHeader(title: "Alerts & Notifications", iconName: "bell.fill", frame: NSRect(x: 16, y: 164, width: 520, height: 22))
+        let card3Title = createSectionHeader(title: "Daily Summary", iconName: "calendar.badge.clock", frame: NSRect(x: 16, y: 100, width: 580, height: 22))
         card3.addSubview(card3Title)
-
-        // Sound and Dismiss alert go first inside Alerts & Notifications
-        let soundLabel = NSTextField(labelWithString: "Sound")
-        soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        soundLabel.frame = NSRect(x: 20, y: 130, width: 220, height: 20)
-        card3.addSubview(soundLabel)
         
-        soundPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 127, width: 225, height: 26))
-        soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
-        card3.addSubview(soundPopUp)
-        
-        let previewBtn = NSButton(title: "▶", target: self, action: #selector(previewSound))
-        previewBtn.frame = NSRect(x: 476, y: 127, width: 54, height: 26)
-        previewBtn.bezelStyle = .rounded
-        previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        card3.addSubview(previewBtn)
-        
-        let dismissLabel = NSTextField(labelWithString: "Dismiss alert after")
-        dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        dismissLabel.frame = NSRect(x: 20, y: 94, width: 220, height: 20)
-        card3.addSubview(dismissLabel)
-        
-        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 91, width: 285, height: 26))
-        dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
-        card3.addSubview(dismissPopUp)
-        
-        // Daily Summary settings under Alerts & Notifications
-        dailyCheckCheckbox = NSButton(checkboxWithTitle: "  Show daily summary at", target: self, action: #selector(dailyCheckToggled))
+        dailyCheckCheckbox = NSButton(checkboxWithTitle: "Show at", target: self, action: #selector(dailyCheckToggled))
         dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        dailyCheckCheckbox.frame = NSRect(x: 20, y: 50, width: 190, height: 22)
+        dailyCheckCheckbox.frame = NSRect(x: 20, y: 58, width: 155, height: 22)
         card3.addSubview(dailyCheckCheckbox)
         
-        timePopUp = NSPopUpButton(frame: NSRect(x: 215, y: 47, width: 315, height: 26))
+        timePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 55, width: 420, height: 26))
         timePopUp.addItems(withTitles: timeOptions.map { $0.title })
         card3.addSubview(timePopUp)
         
-        let startX: CGFloat = 215
-        let totalW: CGFloat = 315.0
+        let startX: CGFloat = 185
+        let totalW: CGFloat = 420.0
         let spacing: CGFloat = 4.0
         let btnWidth: CGFloat = (totalW - 6.0 * spacing) / 7.0
         
         for (idx, dName) in dayNames.enumerated() {
             let btnX = startX + CGFloat(idx) * (btnWidth + spacing)
             let btn = NSButton(title: dName, target: self, action: #selector(dayButtonToggled))
-            btn.frame = NSRect(x: btnX, y: 14, width: btnWidth, height: 24)
+            btn.frame = NSRect(x: btnX, y: 18, width: btnWidth, height: 26)
             btn.setButtonType(.pushOnPushOff)
             btn.bezelStyle = .recessed
             btn.font = NSFont.systemFont(ofSize: 11, weight: .regular)
@@ -945,27 +1014,69 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card3)
         
-        // ── Card 4: Startup (y: 64, height: 78) ───────────
-        let card4 = createCardView(frame: NSRect(x: 24, y: 64, width: 552, height: 78))
+        // ── Card 4: Alerts & Notifications (y: 70, height: 175) ──────
+        let card4 = createCardView(frame: NSRect(x: 24, y: 70, width: 612, height: 175))
         
-        let card4Title = createSectionHeader(title: "Startup", iconName: "power", frame: NSRect(x: 16, y: 44, width: 520, height: 22))
+        let card4Title = createSectionHeader(title: "Alerts & Notifications", iconName: "bell.fill", frame: NSRect(x: 16, y: 140, width: 580, height: 22))
         card4.addSubview(card4Title)
         
-        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "  Start at login", target: self, action: nil)
-        launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        launchAtLoginCheckbox.frame = NSRect(x: 20, y: 14, width: 510, height: 22)
-        card4.addSubview(launchAtLoginCheckbox)
+        // Notification Style setting
+        let styleLabel = NSTextField(labelWithString: "Notification Style")
+        styleLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        styleLabel.frame = NSRect(x: 20, y: 100, width: 155, height: 20)
+        card4.addSubview(styleLabel)
+        
+        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 97, width: 376, height: 26))
+        notificationStylePopUp.addItems(withTitles: ["System Notification Banner", "Mid-Screen Popup Window"])
+        card4.addSubview(notificationStylePopUp)
+        
+        notificationStyleInfoBtn = NSButton(title: "?", target: self, action: #selector(showNotificationStyleInfo))
+        notificationStyleInfoBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
+        notificationStyleInfoBtn.bezelStyle = .rounded
+        notificationStyleInfoBtn.frame = NSRect(x: 567, y: 96, width: 38, height: 26)
+        notificationStyleInfoBtn.toolTip = "Learn about Notification Delivery Styles"
+        card4.addSubview(notificationStyleInfoBtn)
+
+        // Sound and Dismiss alert
+        let soundLabel = NSTextField(labelWithString: "Sound")
+        soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        soundLabel.frame = NSRect(x: 20, y: 58, width: 155, height: 20)
+        card4.addSubview(soundLabel)
+        
+        soundPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 55, width: 300, height: 26))
+        soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
+        card4.addSubview(soundPopUp)
+        
+        let previewBtn = NSButton(title: "▶ Preview", target: self, action: #selector(previewSound))
+        previewBtn.frame = NSRect(x: 490, y: 55, width: 115, height: 26)
+        previewBtn.bezelStyle = .rounded
+        previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        card4.addSubview(previewBtn)
+        
+        let dismissLabel = NSTextField(labelWithString: "Dismiss alert after")
+        dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        dismissLabel.frame = NSRect(x: 20, y: 18, width: 155, height: 20)
+        card4.addSubview(dismissLabel)
+        
+        dismissPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 15, width: 420, height: 26))
+        dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
+        card4.addSubview(dismissPopUp)
         
         contentView.addSubview(card4)
         
         // ── Bottom Action Footer ──────────────────────────────────────
+        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: self, action: nil)
+        launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        launchAtLoginCheckbox.frame = NSRect(x: 24, y: 18, width: 160, height: 22)
+        contentView.addSubview(launchAtLoginCheckbox)
+        
         let cancelBtn = NSButton(title: "Cancel", target: self, action: #selector(cancelClicked))
-        cancelBtn.frame = NSRect(x: 360, y: 14, width: 100, height: 32)
+        cancelBtn.frame = NSRect(x: 410, y: 14, width: 100, height: 32)
         cancelBtn.bezelStyle = .rounded
         contentView.addSubview(cancelBtn)
         
         let saveBtn = NSButton(title: "Save Settings", target: self, action: #selector(saveClicked))
-        saveBtn.frame = NSRect(x: 465, y: 14, width: 112, height: 32)
+        saveBtn.frame = NSRect(x: 520, y: 14, width: 116, height: 32)
         saveBtn.bezelStyle = .rounded
         saveBtn.keyEquivalent = "\r"
         contentView.addSubview(saveBtn)
@@ -997,6 +1108,53 @@ class SettingsWindowController: NSWindowController {
         return header
     }
 
+    @objc func showCustomUrlInstructions() {
+        let alert = NSAlert()
+        alert.messageText = "Custom Search URLs"
+        alert.informativeText = """
+        You can monitor specific job titles, teams, or custom search criteria by using a custom URL from Apple Jobs.
+
+        Instructions:
+        1. Open jobs.apple.com in your web browser.
+        2. Search for your desired role or keywords (for example: "Python" or "iOS").
+        3. Copy the complete URL from your browser's address bar.
+        4. Select "Custom URL" in Jobs Monitor and paste the link.
+
+        Note:
+        Apple's search engine automatically scans your keywords across job titles, descriptions, responsibilities, and qualifications.
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        if let img = NSImage(contentsOfFile: iconPath) {
+            alert.icon = img
+        }
+        alert.runModal()
+    }
+    
+    @objc func showNotificationStyleInfo() {
+        let alert = NSAlert()
+        alert.messageText = "Notification Styles"
+        alert.informativeText = """
+        Jobs Monitor provides two notification delivery modes when new job openings are detected.
+
+        • Mid-Screen Popup Window (Default)
+        Displays an interactive alert window in the center of your screen. Mid-screen popup windows bypass macOS Do Not Disturb settings to ensure urgent postings are noticed immediately.
+
+        • System Notification Banner
+        Delivers standard macOS system notifications in the upper-right corner of your screen. System notification banners adhere to your macOS Do Not Disturb schedule.
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        if let img = NSImage(contentsOfFile: iconPath) {
+            alert.icon = img
+        }
+        alert.runModal()
+    }
+
     @objc func previewSound() {
         let idx = soundPopUp.indexOfSelectedItem
         if idx >= 0 && idx < availableSounds.count {
@@ -1017,6 +1175,7 @@ class SettingsWindowController: NSWindowController {
         countryPopUp.isEnabled = (sender.tag == 0)
         cityPopUp.isEnabled = (sender.tag == 1)
         customUrlField.isEnabled = (sender.tag == 2)
+        customUrlInstructionsBtn.isEnabled = (sender.tag == 2)
     }
     
     @objc func dailyCheckToggled(_ sender: NSButton) {
@@ -1040,6 +1199,7 @@ class SettingsWindowController: NSWindowController {
         countryPopUp.isEnabled = (s.locationMode == 0)
         cityPopUp.isEnabled = (s.locationMode == 1)
         customUrlField.isEnabled = (s.locationMode == 2)
+        customUrlInstructionsBtn.isEnabled = (s.locationMode == 2)
         
         countryPopUp.selectItem(at: (s.countryIndex >= 0 && s.countryIndex < countryPresets.count) ? s.countryIndex : 0)
         cityPopUp.selectItem(at: (s.cityIndex >= 0 && s.cityIndex < cityPresets.count) ? s.cityIndex : 0)
@@ -1058,6 +1218,9 @@ class SettingsWindowController: NSWindowController {
         case 1440: intervalPopUp.selectItem(at: 8)
         default: intervalPopUp.selectItem(at: 4)
         }
+        
+        // Notification Style (Default: 1 - Mid-Screen Popup Window)
+        notificationStylePopUp.selectItem(at: s.notificationStyle == 0 ? 0 : 1)
         
         switch s.popupDismissSeconds {
         case 10: dismissPopUp.selectItem(at: 0)
@@ -1119,6 +1282,8 @@ class SettingsWindowController: NSWindowController {
         default: s.checkIntervalMinutes = 120
         }
         
+        s.notificationStyle = notificationStylePopUp.indexOfSelectedItem == 0 ? 0 : 1
+        
         switch dismissPopUp.indexOfSelectedItem {
         case 0: s.popupDismissSeconds = 10
         case 1: s.popupDismissSeconds = 30
@@ -1153,7 +1318,7 @@ class SettingsWindowController: NSWindowController {
 }
 
 // ── Main App Delegate (Menu Bar App) ───────────────────────────────────────────
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     var statusItem: NSStatusItem!
     var timer: Timer?
     var dailyTimer: Timer?
@@ -1181,6 +1346,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         logMessage(" Jobs Monitor App Starting...")
+        
+        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                logMessage("UNUserNotificationCenter authorization notice: \(error.localizedDescription)")
+            }
+        }
         
         setupMainMenu()
         
@@ -1320,15 +1492,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             
+            let isNewer = self.compareVersions(remote: remoteVersion, current: APP_VERSION)
             var notes = ""
             if let changelogs = json["changelog"] as? [[String: Any]] {
-                let unreadEntries = changelogs.filter { entry in
-                    if let v = entry["version"] as? String {
-                        return self.compareVersions(remote: v, current: APP_VERSION)
+                let targetEntries: [[String: Any]]
+                if isNewer {
+                    targetEntries = changelogs.filter { entry in
+                        if let v = entry["version"] as? String {
+                            return self.compareVersions(remote: v, current: APP_VERSION)
+                        }
+                        return false
                     }
-                    return false
+                } else {
+                    targetEntries = Array(changelogs.prefix(2))
                 }
-                notes = unreadEntries.compactMap { entry -> String? in
+                
+                notes = targetEntries.compactMap { entry -> String? in
                     guard let v = entry["version"] as? String,
                           let changes = entry["changes"] as? [String] else { return nil }
                     let changeList = changes.map { "• \($0)" }.joined(separator: "\n")
@@ -1336,7 +1515,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }.joined(separator: "\n\n")
             }
             
-            let isNewer = self.compareVersions(remote: remoteVersion, current: APP_VERSION)
             if isNewer || !silentIfCurrent {
                 DispatchQueue.main.async {
                     self.showUpdateAlert(remoteVersion: remoteVersion, changelog: notes, isNewer: isNewer)
@@ -1384,9 +1562,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if response == .alertFirstButtonReturn {
                 downloadAndInstallUpdate()
             }
-        } else {
+        } else if remoteVersion != nil {
             alert.messageText = "You're Up to Date!"
-            alert.informativeText = "Jobs Monitor v\(APP_VERSION) is currently the latest version available."
+            alert.informativeText = "Jobs Monitor v\(APP_VERSION) is the latest version."
+            if !changelog.isEmpty {
+                let hosting = NSHostingView(rootView: UpdateChangelogView(changelog: changelog))
+                hosting.frame = NSRect(x: 0, y: 0, width: 340, height: 140)
+                alert.accessoryView = hosting
+            }
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        } else {
+            alert.messageText = "Couldn't Check for Updates"
+            alert.informativeText = "Please check your internet connection and try again."
             alert.addButton(withTitle: "OK")
             alert.runModal()
         }
@@ -1583,7 +1771,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             
-            let jobs = parseJobsFromHTML(html, defaultSearchUrl: settings.activeUrl)
+            let jobs = parseJobsFromHTML(html, defaultSearchUrl: settings.activeUrl, settings: settings)
             logMessage("Fetched \(jobs.count) roles for \(settings.locationTitle)")
             
             var state = loadStateData()
@@ -1635,40 +1823,78 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func showNativeAlert(title: String, message: String) {
-        // Play notification sound
         let settings = loadSettings()
+        
+        // Play custom notification sound if configured
         playNotificationSound(settings.notificationSound)
         
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "View Dashboard")
-        alert.addButton(withTitle: "Dismiss")
-        
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
-        if let img = NSImage(contentsOfFile: iconPath) {
-            alert.icon = img
-        }
-        
-        
-        if settings.popupDismissSeconds > 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(settings.popupDismissSeconds)) {
-                if let window = alert.window.sheetParent ?? NSApp.windows.first(where: { $0.title == title }) {
-                    window.close()
+        if settings.notificationStyle == 0 {
+            // ── System Side Notification (Respects DND) ──────────────────
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = message
+            
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    logMessage("UNUserNotificationCenter dispatch error: \(error.localizedDescription)")
                 }
             }
+        } else {
+            // ── Mid-Screen Modal Window Popup Alert (Bypasses DND) ────────
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = message
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "View Dashboard")
+            alert.addButton(withTitle: "Dismiss")
+            
+            let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+            if let img = NSImage(contentsOfFile: iconPath) {
+                alert.icon = img
+            }
+            
+            if settings.popupDismissSeconds > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(settings.popupDismissSeconds)) {
+                    if let window = alert.window.sheetParent ?? NSApp.windows.first(where: { $0.title == title }) {
+                        window.close()
+                    }
+                }
+            }
+            
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                var state = loadStateData()
+                state.unread_count = 0
+                saveStateData(state)
+                updateBadge(unreadCount: 0)
+                rebuildMenu()
+                NSWorkspace.shared.open(dashboardFile)
+            }
         }
-        
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            var state = loadStateData()
-            state.unread_count = 0
-            saveStateData(state)
-            updateBadge(unreadCount: 0)
-            rebuildMenu()
-            NSWorkspace.shared.open(dashboardFile)
+    }
+    
+    // ── UNUserNotificationCenterDelegate Implementation ──────────────────────
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        if #available(macOS 11.0, *) {
+            completionHandler([.banner, .sound, .list])
+        } else {
+            completionHandler([.alert, .sound])
         }
+    }
+    
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+            DispatchQueue.main.async { [weak self] in
+                var state = loadStateData()
+                state.unread_count = 0
+                saveStateData(state)
+                self?.updateBadge(unreadCount: 0)
+                self?.rebuildMenu()
+                NSWorkspace.shared.open(dashboardFile)
+            }
+        }
+        completionHandler()
     }
 }
 

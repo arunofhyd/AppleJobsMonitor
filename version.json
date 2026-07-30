@@ -1,7 +1,16 @@
 {
-  "version": "2.0.9",
+  "version": "2.1.0",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.1.0",
+      "date": "2026-07-30",
+      "changes": [
+        "Added Notification Style setting to select between System Side Banner (respects DND) and Mid-Screen Window Popup (bypasses DND).",
+        "Cleaned Preferences UI with interactive ❓ and ℹ️ info modals for Custom URLs and Notification Styles.",
+        "Added Location Intelligence Filtering for Country (e.g. India) and City search modes."
+      ]
+    },
     {
       "version": "2.0.9",
       "date": "2026-07-27",
