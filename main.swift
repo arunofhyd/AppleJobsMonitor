@@ -267,11 +267,10 @@ struct AppSettings: Codable {
     var countryIndex: Int
     var cityIndex: Int
     var customUrl: String
-    var keywords: String // e.g. "iOS, Python" or ""
     var checkIntervalMinutes: Int // 5, 15, 30, 60, 120, 240, 360, 720, 1440
     var popupDismissSeconds: Int // 10, 30, 60, 180, 300, 600, 0
     var notificationSound: String // system sound name, or "" for none
-    var notificationStyle: Int // 0: System Side Notification (Respects DND), 1: Mid-Screen Popup Window (Bypasses DND)
+    var notificationStyle: Int // 0: System Side Notification (Banner), 1: Mid-Screen Window (Popup Alert - Default)
     var enableDailyCheck: Bool
     var dailyCheckHour: Int // 0..23
     var dailyCheckMinute: Int // 0..59
@@ -279,15 +278,14 @@ struct AppSettings: Codable {
     var launchAtLogin: Bool
     
     enum CodingKeys: String, CodingKey {
-        case locationMode, countryIndex, cityIndex, customUrl, keywords, checkIntervalMinutes, popupDismissSeconds, notificationSound, notificationStyle, enableDailyCheck, dailyCheckHour, dailyCheckMinute, activeDays, launchAtLogin
+        case locationMode, countryIndex, cityIndex, customUrl, checkIntervalMinutes, popupDismissSeconds, notificationSound, notificationStyle, enableDailyCheck, dailyCheckHour, dailyCheckMinute, activeDays, launchAtLogin
     }
     
-    init(locationMode: Int, countryIndex: Int, cityIndex: Int, customUrl: String, keywords: String = "", checkIntervalMinutes: Int, popupDismissSeconds: Int, notificationSound: String, notificationStyle: Int, enableDailyCheck: Bool, dailyCheckHour: Int, dailyCheckMinute: Int, activeDays: [Bool], launchAtLogin: Bool) {
+    init(locationMode: Int, countryIndex: Int, cityIndex: Int, customUrl: String, checkIntervalMinutes: Int, popupDismissSeconds: Int, notificationSound: String, notificationStyle: Int = 1, enableDailyCheck: Bool, dailyCheckHour: Int, dailyCheckMinute: Int, activeDays: [Bool], launchAtLogin: Bool) {
         self.locationMode = locationMode
         self.countryIndex = countryIndex
         self.cityIndex = cityIndex
         self.customUrl = customUrl
-        self.keywords = keywords
         self.checkIntervalMinutes = checkIntervalMinutes
         self.popupDismissSeconds = popupDismissSeconds
         self.notificationSound = notificationSound
@@ -305,11 +303,10 @@ struct AppSettings: Codable {
         countryIndex = try container.decodeIfPresent(Int.self, forKey: .countryIndex) ?? 0
         cityIndex = try container.decodeIfPresent(Int.self, forKey: .cityIndex) ?? 0
         customUrl = try container.decodeIfPresent(String.self, forKey: .customUrl) ?? "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest"
-        keywords = try container.decodeIfPresent(String.self, forKey: .keywords) ?? ""
         checkIntervalMinutes = try container.decodeIfPresent(Int.self, forKey: .checkIntervalMinutes) ?? 120
         popupDismissSeconds = try container.decodeIfPresent(Int.self, forKey: .popupDismissSeconds) ?? 300
         notificationSound = try container.decodeIfPresent(String.self, forKey: .notificationSound) ?? "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Bulletin.m4r"
-        notificationStyle = try container.decodeIfPresent(Int.self, forKey: .notificationStyle) ?? 0
+        notificationStyle = try container.decodeIfPresent(Int.self, forKey: .notificationStyle) ?? 1
         enableDailyCheck = try container.decodeIfPresent(Bool.self, forKey: .enableDailyCheck) ?? true
         dailyCheckHour = try container.decodeIfPresent(Int.self, forKey: .dailyCheckHour) ?? 10
         dailyCheckMinute = try container.decodeIfPresent(Int.self, forKey: .dailyCheckMinute) ?? 0
@@ -323,11 +320,10 @@ struct AppSettings: Codable {
             countryIndex: 0,
             cityIndex: 0,
             customUrl: "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest",
-            keywords: "",
             checkIntervalMinutes: 120,
             popupDismissSeconds: 300,
             notificationSound: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Bulletin.m4r",
-            notificationStyle: 0,
+            notificationStyle: 1,
             enableDailyCheck: true,
             dailyCheckHour: 10,
             dailyCheckMinute: 0,
@@ -337,19 +333,15 @@ struct AppSettings: Codable {
     }
     
     var activeUrl: String {
-        let kwParam = keywords.trimmingCharacters(in: .whitespacesAndNewlines)
-        let encodedKw = kwParam.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let searchPart = encodedKw.isEmpty ? "" : "&search=\(encodedKw)"
-        
         switch locationMode {
         case 1:
             let idx = (cityIndex >= 0 && cityIndex < cityPresets.count) ? cityIndex : 0
-            return "https://jobs.apple.com/en-us/search?location=\(cityPresets[idx].code)\(searchPart)&sort=newest"
+            return "https://jobs.apple.com/en-us/search?location=\(cityPresets[idx].code)&sort=newest"
         case 2:
-            return customUrl.isEmpty ? "https://jobs.apple.com/en-us/search?location=india-INDC\(searchPart)&sort=newest" : customUrl
+            return customUrl.isEmpty ? "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest" : customUrl
         default:
             let idx = (countryIndex >= 0 && countryIndex < countryPresets.count) ? countryIndex : 0
-            return "https://jobs.apple.com/en-us/search?location=\(countryPresets[idx].code)\(searchPart)&sort=newest"
+            return "https://jobs.apple.com/en-us/search?location=\(countryPresets[idx].code)&sort=newest"
         }
     }
     
@@ -673,37 +665,14 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSe
         }
     }
     
-    // ── 1. Extract Target Keywords ──────────────────────────────────────
-    var targetKeywords: [String] = []
-    if !settings.keywords.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        let kwList = settings.keywords.components(separatedBy: CharacterSet(charactersIn: ",;"))
-        targetKeywords = kwList.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }.filter { !$0.isEmpty }
-    }
-    
-    // Check search= query parameter in URL (e.g. for Custom URLs like ...?search=python&location=india-INDC)
-    if let components = URLComponents(string: defaultSearchUrl),
-       let queryItems = components.queryItems,
-       let searchVal = queryItems.first(where: { $0.name == "search" })?.value,
-       !searchVal.isEmpty {
-        let searchKws = searchVal.components(separatedBy: CharacterSet(charactersIn: " ,;+"))
-        for skw in searchKws {
-            let cleaned = skw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            if !cleaned.isEmpty && !targetKeywords.contains(cleaned) {
-                targetKeywords.append(cleaned)
-            }
-        }
-    }
-    
-    var filtered = rawResults
-    
-    // ── 2. Location Intelligence Filter ──────────────────────────────────
+    // ── Location Intelligence Filter ──────────────────────────────────
     if settings.locationMode == 0 {
         // Country Mode (e.g. India)
         let idx = max(0, min(settings.countryIndex, countryPresets.count - 1))
         let targetCountry = countryPresets[idx].name.lowercased()
         let targetCode = countryPresets[idx].code.lowercased()
         
-        let locFiltered = filtered.filter { job in
+        let filtered = rawResults.filter { job in
             let locLower = job.location.lowercased()
             let cList = (job.countries ?? []).map { $0.lowercased() }
             if cList.contains(where: { $0.contains(targetCountry) || targetCountry.contains($0) }) { return true }
@@ -713,50 +682,21 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSe
             if targetCode.contains("gbr") && (locLower.contains("united kingdom") || locLower.contains("uk")) { return true }
             return false
         }
-        if !locFiltered.isEmpty { filtered = locFiltered }
+        return filtered.isEmpty ? rawResults : filtered
     } else if settings.locationMode == 1 {
         // City Mode (e.g. Bengaluru)
         let idx = max(0, min(settings.cityIndex, cityPresets.count - 1))
         let targetCity = cityPresets[idx].name.lowercased()
         
-        let locFiltered = filtered.filter { job in
+        let filtered = rawResults.filter { job in
             let locLower = job.location.lowercased()
             let cList = (job.cities ?? []).map { $0.lowercased() }
             return cList.contains(where: { $0.contains(targetCity) || targetCity.contains($0) }) || locLower.contains(targetCity)
         }
-        if !locFiltered.isEmpty { filtered = locFiltered }
-    } else if settings.locationMode == 2 {
-        // Custom URL Mode — check if URL specifies location= (e.g. india-INDC)
-        let urlLower = defaultSearchUrl.lowercased()
-        if urlLower.contains("location=india") || urlLower.contains("location=indc") {
-            let locFiltered = filtered.filter { job in
-                let locLower = job.location.lowercased()
-                let cList = (job.countries ?? []).map { $0.lowercased() }
-                return locLower.contains("india") || cList.contains(where: { $0.contains("ind") })
-            }
-            if !locFiltered.isEmpty { filtered = locFiltered }
-        }
+        return filtered.isEmpty ? rawResults : filtered
     }
     
-    // ── 3. Strict Keyword Intelligence Filter ─────────────────────────────
-    // If keywords exist (e.g. search=python or keywords="iOS"), filter to ONLY matching roles!
-    if !targetKeywords.isEmpty {
-        let kwFiltered = filtered.filter { job in
-            let titleLower = job.title.lowercased()
-            let teamLower = job.team.lowercased()
-            let locLower = job.location.lowercased()
-            
-            return targetKeywords.contains { kw in
-                titleLower.contains(kw) || teamLower.contains(kw) || locLower.contains(kw)
-            }
-        }
-        // If keyword matching results are found, return kwFiltered to show ONLY keyword matching jobs!
-        if !kwFiltered.isEmpty {
-            return kwFiltered
-        }
-    }
-    
-    return filtered
+    return rawResults
 }
 
 func normalizeJob(_ raw: [String: Any], defaultUrl: String) -> JobItem? {
@@ -930,10 +870,9 @@ class SettingsWindowController: NSWindowController {
     var customUrlField: NSTextField!
     var customUrlInstructionsBtn: NSButton!
     
-    var keywordsField: NSTextField!
-    
     var intervalPopUp: NSPopUpButton!
     var notificationStylePopUp: NSPopUpButton!
+    var notificationStyleInfoBtn: NSButton!
     var dismissPopUp: NSPopUpButton!
     var soundPopUp: NSPopUpButton!
     
@@ -947,7 +886,7 @@ class SettingsWindowController: NSWindowController {
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 850),
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 750),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -968,7 +907,7 @@ class SettingsWindowController: NSWindowController {
         guard let contentView = window?.contentView else { return }
         
         // ── Top Header Banner (Centralized Logo Only) ─────────────────
-        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 760, width: 600, height: 90))
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 660, width: 600, height: 90))
         
         let iconView = NSImageView(frame: NSRect(x: 268, y: 13, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -985,73 +924,53 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(headerView)
         
-        // ── Card 1: Target Location & Keywords (y: 505, height: 240) ────
-        let card1 = createCardView(frame: NSRect(x: 24, y: 505, width: 552, height: 240))
+        // ── Card 1: Target Location (y: 475, height: 170) ────────────
+        let card1 = createCardView(frame: NSRect(x: 24, y: 475, width: 552, height: 170))
         
-        let card1Title = createSectionHeader(title: "Location & Keywords", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 204, width: 520, height: 22))
+        let card1Title = createSectionHeader(title: "Target Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 134, width: 520, height: 22))
         card1.addSubview(card1Title)
         
         radioCountry = NSButton(radioButtonWithTitle: "  Country", target: self, action: #selector(radioChanged))
         radioCountry.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCountry.frame = NSRect(x: 20, y: 168, width: 140, height: 22)
+        radioCountry.frame = NSRect(x: 20, y: 98, width: 140, height: 22)
         radioCountry.tag = 0
         card1.addSubview(radioCountry)
         
-        countryPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 165, width: 365, height: 26))
+        countryPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 95, width: 365, height: 26))
         countryPopUp.addItems(withTitles: countryPresets.map { $0.name })
         card1.addSubview(countryPopUp)
         
         radioCity = NSButton(radioButtonWithTitle: "  City", target: self, action: #selector(radioChanged))
         radioCity.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCity.frame = NSRect(x: 20, y: 132, width: 140, height: 22)
+        radioCity.frame = NSRect(x: 20, y: 62, width: 140, height: 22)
         radioCity.tag = 1
         card1.addSubview(radioCity)
         
-        cityPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 129, width: 365, height: 26))
+        cityPopUp = NSPopUpButton(frame: NSRect(x: 165, y: 59, width: 365, height: 26))
         cityPopUp.addItems(withTitles: cityPresets.map { $0.name })
         card1.addSubview(cityPopUp)
         
         radioCustom = NSButton(radioButtonWithTitle: "  Custom URL", target: self, action: #selector(radioChanged))
         radioCustom.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        radioCustom.frame = NSRect(x: 20, y: 96, width: 140, height: 22)
+        radioCustom.frame = NSRect(x: 20, y: 26, width: 140, height: 22)
         radioCustom.tag = 2
         card1.addSubview(radioCustom)
         
-        customUrlField = NSTextField(frame: NSRect(x: 165, y: 94, width: 255, height: 24))
+        customUrlField = NSTextField(frame: NSRect(x: 165, y: 24, width: 325, height: 24))
         customUrlField.placeholderString = "https://jobs.apple.com/en-us/search?..."
         card1.addSubview(customUrlField)
         
-        customUrlInstructionsBtn = NSButton(title: "Instructions ❓", target: self, action: #selector(showCustomUrlInstructions))
-        customUrlInstructionsBtn.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        customUrlInstructionsBtn.bezelStyle = .inline
-        customUrlInstructionsBtn.frame = NSRect(x: 428, y: 94, width: 102, height: 24)
+        customUrlInstructionsBtn = NSButton(title: "❓", target: self, action: #selector(showCustomUrlInstructions))
+        customUrlInstructionsBtn.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        customUrlInstructionsBtn.bezelStyle = .rounded
+        customUrlInstructionsBtn.frame = NSRect(x: 498, y: 23, width: 32, height: 26)
+        customUrlInstructionsBtn.toolTip = "How to use Custom URLs and Search Keywords"
         card1.addSubview(customUrlInstructionsBtn)
-        
-        let customHintLabel = NSTextField(wrappingLabelWithString: "💡 Add search=KEYWORD to URL to scan full job postings (titles, descriptions & qualifications).")
-        customHintLabel.font = NSFont.systemFont(ofSize: 10, weight: .regular)
-        customHintLabel.textColor = .secondaryLabelColor
-        customHintLabel.frame = NSRect(x: 165, y: 74, width: 365, height: 18)
-        card1.addSubview(customHintLabel)
-        
-        let keywordsLabel = NSTextField(labelWithString: "  Keywords")
-        keywordsLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        keywordsLabel.frame = NSRect(x: 20, y: 44, width: 140, height: 22)
-        card1.addSubview(keywordsLabel)
-        
-        keywordsField = NSTextField(frame: NSRect(x: 165, y: 42, width: 365, height: 24))
-        keywordsField.placeholderString = "e.g. iOS, Python, Manager (leave blank for all roles)"
-        card1.addSubview(keywordsField)
-        
-        let keywordsHintLabel = NSTextField(wrappingLabelWithString: "💡 Filters jobs to show ONLY those matching your keywords in your selected location.")
-        keywordsHintLabel.font = NSFont.systemFont(ofSize: 10, weight: .regular)
-        keywordsHintLabel.textColor = .secondaryLabelColor
-        keywordsHintLabel.frame = NSRect(x: 165, y: 18, width: 365, height: 20)
-        card1.addSubview(keywordsHintLabel)
         
         contentView.addSubview(card1)
         
-        // ── Card 2: Refresh Frequency (y: 405, height: 90) ─────────
-        let card2 = createCardView(frame: NSRect(x: 24, y: 405, width: 552, height: 90))
+        // ── Card 2: Refresh Frequency (y: 370, height: 90) ─────────
+        let card2 = createCardView(frame: NSRect(x: 24, y: 370, width: 552, height: 90))
         
         let card2Title = createSectionHeader(title: "Refresh Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 54, width: 520, height: 22))
         card2.addSubview(card2Title)
@@ -1067,60 +986,61 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card2)
         
-        // ── Card 3: Alerts & Notifications (y: 130, height: 265) ──────
-        let card3 = createCardView(frame: NSRect(x: 24, y: 130, width: 552, height: 265))
+        // ── Card 3: Alerts & Notifications (y: 130, height: 225) ──────
+        let card3 = createCardView(frame: NSRect(x: 24, y: 130, width: 552, height: 225))
         
-        let card3Title = createSectionHeader(title: "Alerts & Notifications", iconName: "bell.fill", frame: NSRect(x: 16, y: 228, width: 520, height: 22))
+        let card3Title = createSectionHeader(title: "Alerts & Notifications", iconName: "bell.fill", frame: NSRect(x: 16, y: 188, width: 520, height: 22))
         card3.addSubview(card3Title)
         
         // Notification Style setting
         let styleLabel = NSTextField(labelWithString: "Notification Style")
         styleLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        styleLabel.frame = NSRect(x: 20, y: 194, width: 220, height: 20)
+        styleLabel.frame = NSRect(x: 20, y: 154, width: 220, height: 20)
         card3.addSubview(styleLabel)
         
-        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 245, y: 191, width: 285, height: 26))
-        notificationStylePopUp.addItems(withTitles: ["System Side Notification (Banner)", "Mid-Screen Window (Popup Alert)"])
+        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 245, y: 151, width: 245, height: 26))
+        notificationStylePopUp.addItems(withTitles: ["System Side Banner (Respects DND)", "Mid-Screen Popup Window (Bypasses DND)"])
         card3.addSubview(notificationStylePopUp)
         
-        let dndNoteLabel = NSTextField(wrappingLabelWithString: "ℹ️ Side notifications respect macOS Do Not Disturb (DND). Mid-screen popups bypass DND.")
-        dndNoteLabel.font = NSFont.systemFont(ofSize: 10, weight: .regular)
-        dndNoteLabel.textColor = .secondaryLabelColor
-        dndNoteLabel.frame = NSRect(x: 245, y: 168, width: 285, height: 22)
-        card3.addSubview(dndNoteLabel)
+        notificationStyleInfoBtn = NSButton(title: "ℹ️", target: self, action: #selector(showNotificationStyleInfo))
+        notificationStyleInfoBtn.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        notificationStyleInfoBtn.bezelStyle = .rounded
+        notificationStyleInfoBtn.frame = NSRect(x: 498, y: 150, width: 32, height: 26)
+        notificationStyleInfoBtn.toolTip = "Learn about Notification Styles & Do Not Disturb (DND)"
+        card3.addSubview(notificationStyleInfoBtn)
 
         // Sound and Dismiss alert
         let soundLabel = NSTextField(labelWithString: "Sound")
         soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        soundLabel.frame = NSRect(x: 20, y: 136, width: 220, height: 20)
+        soundLabel.frame = NSRect(x: 20, y: 114, width: 220, height: 20)
         card3.addSubview(soundLabel)
         
-        soundPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 133, width: 225, height: 26))
+        soundPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 111, width: 225, height: 26))
         soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
         card3.addSubview(soundPopUp)
         
         let previewBtn = NSButton(title: "▶", target: self, action: #selector(previewSound))
-        previewBtn.frame = NSRect(x: 476, y: 133, width: 54, height: 26)
+        previewBtn.frame = NSRect(x: 476, y: 111, width: 54, height: 26)
         previewBtn.bezelStyle = .rounded
         previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         card3.addSubview(previewBtn)
         
         let dismissLabel = NSTextField(labelWithString: "Dismiss alert after")
         dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        dismissLabel.frame = NSRect(x: 20, y: 100, width: 220, height: 20)
+        dismissLabel.frame = NSRect(x: 20, y: 74, width: 220, height: 20)
         card3.addSubview(dismissLabel)
         
-        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 97, width: 285, height: 26))
+        dismissPopUp = NSPopUpButton(frame: NSRect(x: 245, y: 71, width: 285, height: 26))
         dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
         card3.addSubview(dismissPopUp)
         
         // Daily Summary settings under Alerts & Notifications
         dailyCheckCheckbox = NSButton(checkboxWithTitle: "  Show daily summary at", target: self, action: #selector(dailyCheckToggled))
         dailyCheckCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        dailyCheckCheckbox.frame = NSRect(x: 20, y: 54, width: 190, height: 22)
+        dailyCheckCheckbox.frame = NSRect(x: 20, y: 40, width: 190, height: 22)
         card3.addSubview(dailyCheckCheckbox)
         
-        timePopUp = NSPopUpButton(frame: NSRect(x: 215, y: 51, width: 315, height: 26))
+        timePopUp = NSPopUpButton(frame: NSRect(x: 215, y: 37, width: 315, height: 26))
         timePopUp.addItems(withTitles: timeOptions.map { $0.title })
         card3.addSubview(timePopUp)
         
@@ -1132,7 +1052,7 @@ class SettingsWindowController: NSWindowController {
         for (idx, dName) in dayNames.enumerated() {
             let btnX = startX + CGFloat(idx) * (btnWidth + spacing)
             let btn = NSButton(title: dName, target: self, action: #selector(dayButtonToggled))
-            btn.frame = NSRect(x: btnX, y: 16, width: btnWidth, height: 24)
+            btn.frame = NSRect(x: btnX, y: 10, width: btnWidth, height: 22)
             btn.setButtonType(.pushOnPushOff)
             btn.bezelStyle = .recessed
             btn.font = NSFont.systemFont(ofSize: 11, weight: .regular)
@@ -1143,15 +1063,15 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card3)
         
-        // ── Card 4: Startup (y: 54, height: 66) ───────────
-        let card4 = createCardView(frame: NSRect(x: 24, y: 54, width: 552, height: 66))
+        // ── Card 4: Startup (y: 54, height: 60) ───────────
+        let card4 = createCardView(frame: NSRect(x: 24, y: 54, width: 552, height: 60))
         
-        let card4Title = createSectionHeader(title: "Startup", iconName: "power", frame: NSRect(x: 16, y: 34, width: 520, height: 22))
+        let card4Title = createSectionHeader(title: "Startup", iconName: "power", frame: NSRect(x: 16, y: 30, width: 520, height: 22))
         card4.addSubview(card4Title)
         
         launchAtLoginCheckbox = NSButton(checkboxWithTitle: "  Start at login", target: self, action: nil)
         launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        launchAtLoginCheckbox.frame = NSRect(x: 20, y: 8, width: 510, height: 22)
+        launchAtLoginCheckbox.frame = NSRect(x: 20, y: 6, width: 510, height: 22)
         card4.addSubview(launchAtLoginCheckbox)
         
         contentView.addSubview(card4)
@@ -1197,20 +1117,42 @@ class SettingsWindowController: NSWindowController {
 
     @objc func showCustomUrlInstructions() {
         let alert = NSAlert()
-        alert.messageText = "How to Use Custom URLs & Keywords"
+        alert.messageText = "Custom URLs & Search Keywords"
         alert.informativeText = """
-        1. Open jobs.apple.com in Safari or Chrome.
+        How to monitor specific roles or custom search filters:
         
-        2. Enter your desired keywords in the search bar (e.g. "Software Engineer", "Python", "iOS", "Machine Learning").
+        1. Open jobs.apple.com in your web browser.
         
-        3. Apply any location, team, or role filters on Apple Jobs.
+        2. Perform your desired search (e.g. search "Python" or "iOS" in India).
         
-        4. Copy the complete URL from your browser's address bar.
-           Example: https://jobs.apple.com/en-us/search?search=Python&location=india-INDC&sort=newest
+        3. Copy the full URL from your browser's address bar:
+           Example: https://jobs.apple.com/en-us/search?search=Python&location=india-INDC
         
-        5. Paste the copied URL into the Custom URL box in Jobs Monitor.
+        4. Select "Custom URL" in Jobs Monitor and paste your link.
         
-        💡 Full Keyword Scanning: Apple's "search=" URL parameter automatically searches your keywords across the ENTIRE job posting — including job descriptions, qualifications, responsibilities, and titles!
+        💡 Tip: Apple's search engine automatically scans your keywords across job titles, descriptions, and qualifications!
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Got it")
+        
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        if let img = NSImage(contentsOfFile: iconPath) {
+            alert.icon = img
+        }
+        alert.runModal()
+    }
+    
+    @objc func showNotificationStyleInfo() {
+        let alert = NSAlert()
+        alert.messageText = "Notification Style Explanation"
+        alert.informativeText = """
+        • Mid-Screen Popup Window (Default):
+          Displays an interactive alert window directly in the center of your screen when new jobs are detected.
+          ⚡ Mid-screen popups bypass macOS Do Not Disturb (DND) so you never miss a posting.
+        
+        • System Side Banner:
+          Delivers standard macOS banner notifications in the top-right corner.
+          🌙 Side notifications respect macOS Do Not Disturb (DND) settings.
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Got it")
@@ -1272,7 +1214,6 @@ class SettingsWindowController: NSWindowController {
         cityPopUp.selectItem(at: (s.cityIndex >= 0 && s.cityIndex < cityPresets.count) ? s.cityIndex : 0)
         
         customUrlField.stringValue = s.customUrl
-        keywordsField.stringValue = s.keywords
         
         switch s.checkIntervalMinutes {
         case 5: intervalPopUp.selectItem(at: 0)
@@ -1287,8 +1228,8 @@ class SettingsWindowController: NSWindowController {
         default: intervalPopUp.selectItem(at: 4)
         }
         
-        // Notification Style
-        notificationStylePopUp.selectItem(at: s.notificationStyle == 1 ? 1 : 0)
+        // Notification Style (Default: 1 - Mid-Screen Popup Window)
+        notificationStylePopUp.selectItem(at: s.notificationStyle == 0 ? 0 : 1)
         
         switch s.popupDismissSeconds {
         case 10: dismissPopUp.selectItem(at: 0)
@@ -1336,7 +1277,6 @@ class SettingsWindowController: NSWindowController {
         s.countryIndex = countryPopUp.indexOfSelectedItem
         s.cityIndex = cityPopUp.indexOfSelectedItem
         s.customUrl = customUrlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        s.keywords = keywordsField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         
         switch intervalPopUp.indexOfSelectedItem {
         case 0: s.checkIntervalMinutes = 5
@@ -1351,7 +1291,7 @@ class SettingsWindowController: NSWindowController {
         default: s.checkIntervalMinutes = 120
         }
         
-        s.notificationStyle = notificationStylePopUp.indexOfSelectedItem
+        s.notificationStyle = notificationStylePopUp.indexOfSelectedItem == 0 ? 0 : 1
         
         switch dismissPopUp.indexOfSelectedItem {
         case 0: s.popupDismissSeconds = 10
