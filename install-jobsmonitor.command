@@ -156,14 +156,14 @@ if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     BUILD_DIR_LOCAL="$SCRIPT_DIR/Build"
     mkdir -p "$BUILD_DIR_LOCAL"
-    TARGET_APP="$BUILD_DIR_LOCAL/$APP_NAME.app"
+    BUILD_APP="$BUILD_DIR_LOCAL/$APP_NAME.app"
 else
-    TARGET_APP="/Applications/$APP_NAME.app"
+    BUILD_APP="$BUILD_DIR/$APP_NAME.app"
     pkill -x "$APP_NAME" 2>/dev/null
 fi
-rm -rf "$TARGET_APP"
+rm -rf "$BUILD_APP"
 
-CONTENTS_DIR="$TARGET_APP/Contents"
+CONTENTS_DIR="$BUILD_APP/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
@@ -213,16 +213,28 @@ cat << EOF > "$CONTENTS_DIR/Info.plist"
 </dict>
 </plist>
 EOF
-codesign --force --deep --sign - --requirements '=designated => identifier "'"$PLIST_LABEL"'"' "$TARGET_APP" >/dev/null 2>&1 || true
-ok "App bundle created."
-printf "\n"
+codesign --force --deep --sign - --requirements '=designated => identifier "'"$PLIST_LABEL"'"' "$BUILD_APP" >/dev/null 2>&1 || true
 
 if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
+    TARGET_APP="$BUILD_APP"
+    ok "App bundle created."
+    printf "\n"
     line
     printf "${WHITE}${BOLD}   ✓ CI Build Complete: $TARGET_APP${NC}\n"
     line
     printf "\n"
     exit 0
+else
+    TARGET_APP="/Applications/$APP_NAME.app"
+    if [ -w "/Applications" ] || [ -w "$TARGET_APP" ]; then
+        rm -rf "$TARGET_APP" 2>/dev/null
+        cp -R "$BUILD_APP" "/Applications/"
+    else
+        osascript -e "do shell script \"rm -rf '$TARGET_APP'; cp -R '$BUILD_APP' '/Applications/'\" with administrator privileges" >/dev/null 2>&1
+    fi
+    xattr -dr com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
+    ok "App bundle created & installed to Applications."
+    printf "\n"
 fi
 
 # ---- Step 5: Installing background agent & launching --------------------
