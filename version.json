@@ -1,7 +1,16 @@
 {
-  "version": "2.1.0",
+  "version": "2.1.1",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.1.1",
+      "date": "2026-07-30",
+      "changes": [
+        "Cleaned Preferences UI: replaced cramped text labels with clean interactive ❓ and ℹ️ info modals.",
+        "Set Mid-Screen Window Popup Alert as the default notification style.",
+        "Refined Target Location layout and Custom URL guidance."
+      ]
+    },
     {
       "version": "2.1.0",
       "date": "2026-07-30",
