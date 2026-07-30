@@ -9,6 +9,8 @@
 # =============================================================================
 
 APP_NAME="JobsMonitor"
+PLIST_LABEL="com.aoh.jobsmonitor"
+REPO_RAW="https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main"
 
 # ---- Apple Monochrome (White & Black) terminal styling -------------------
 BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
