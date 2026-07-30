@@ -1,9 +1,9 @@
 {
-  "version": "2.1.2",
+  "version": "2.1.3",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
     {
-      "version": "2.1.2",
+      "version": "2.1.3",
       "date": "2026-07-30",
       "changes": [
         "Automatically open Jobs Monitor Notification settings on first launch.",

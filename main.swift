@@ -5,7 +5,7 @@ import SwiftUI
 import UserNotifications
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.1.2"
+let APP_VERSION = "2.1.3"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -1568,11 +1568,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         } else if remoteVersion != nil {
             alert.messageText = "You're Up to Date!"
             alert.informativeText = "Jobs Monitor v\(APP_VERSION) is the latest version."
-            if !changelog.isEmpty {
-                let hosting = NSHostingView(rootView: UpdateChangelogView(changelog: changelog))
-                hosting.frame = NSRect(x: 0, y: 0, width: 340, height: 140)
-                alert.accessoryView = hosting
-            }
             alert.addButton(withTitle: "OK")
             alert.runModal()
         } else {

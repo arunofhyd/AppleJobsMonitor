@@ -126,7 +126,7 @@ else
 fi
 
 APP_VERSION=$(grep -m1 'let APP_VERSION =' "$BUILD_DIR/main.swift" | cut -d'"' -f2)
-if [ -z "$APP_VERSION" ]; then APP_VERSION="2.1.2"; fi
+if [ -z "$APP_VERSION" ]; then APP_VERSION="2.1.3"; fi
 
 ok "Workspace ready. Version: $APP_VERSION"
 printf "\n"
