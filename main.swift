@@ -5,7 +5,7 @@ import SwiftUI
 import UserNotifications
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.1.3"
+let APP_VERSION = "2.1.4"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -1356,6 +1356,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         
         setupMainMenu()
         
+        // Observe system wake from sleep so timers stay accurate and missed daily checks trigger
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(macOSDidWake),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+        
         let settings = loadSettings()
         configureLaunchAtLogin(enabled: settings.launchAtLogin)
         
@@ -1620,6 +1628,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         task.resume()
     }
     
+    @objc func macOSDidWake(_ notification: Notification) {
+        logMessage("macOS woke from sleep — refreshing timers and checking scheduled daily digest")
+        scheduleTimer()
+        scheduleDailyTimer()
+    }
+    
     func scheduleTimer() {
         timer?.invalidate()
         let settings = loadSettings()
@@ -1627,6 +1641,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         
         timer = Timer.scheduledTimer(withTimeInterval: intervalSeconds, repeats: true) { [weak self] _ in
             self?.performCheck(isManual: false)
+            self?.scheduleDailyTimer()
         }
     }
     
