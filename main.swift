@@ -5,7 +5,7 @@ import SwiftUI
 import UserNotifications
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.1.4"
+let APP_VERSION = "2.1.5"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -1318,7 +1318,7 @@ class SettingsWindowController: NSWindowController {
 }
 
 // ── Main App Delegate (Menu Bar App) ───────────────────────────────────────────
-class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, NSMenuDelegate {
     var statusItem: NSStatusItem!
     var timer: Timer?
     var dailyTimer: Timer?
@@ -1473,7 +1473,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         quitItem.target = self
         menu.addItem(quitItem)
         
+        menu.delegate = self
         statusItem.menu = menu
+    }
+    
+    func menuWillOpen(_ menu: NSMenu) {
+        let state = loadStateData()
+        var lastCheckedText = state.last_checked_str ?? "Just now"
+        if lastCheckedText.contains("AM") || lastCheckedText.contains("PM") || lastCheckedText == "Never" {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "d MMM, HH:mm"
+            lastCheckedText = formatter.string(from: Date())
+        }
+        if menu.items.count > 1 {
+            menu.items[1].title = "Last Checked: \(lastCheckedText)"
+        }
     }
     
     @objc func manualUpdateCheck() {
@@ -1802,6 +1816,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             DispatchQueue.main.async {
                 let currentUnread = (state.unread_count ?? 0) + newJobs.count
                 state.unread_count = currentUnread
+                state.seen_ids = Array(Set(state.seen_ids + jobs.map { $0.id }))
+                saveStateData(state)
+                
                 self.updateBadge(unreadCount: currentUnread)
                 self.rebuildMenu()
                 
@@ -1814,9 +1831,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                                                      searchUrl: settings.activeUrl)
                 
                 try? htmlStr.write(to: dashboardFile, atomically: true, encoding: .utf8)
-                
-                state.seen_ids = Array(Set(state.seen_ids + jobs.map { $0.id }))
-                saveStateData(state)
                 
                 if !newJobs.isEmpty {
                     let plural = newJobs.count > 1 ? "s" : ""
