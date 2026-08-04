@@ -38,8 +38,9 @@ printf "\n"
 step "Checking system prerequisites…"
 if ! command -v swiftc >/dev/null 2>&1; then
     fail "Swift compiler (swiftc) not found."
-    printf "\n  ${GREY}Please install Xcode Command Line Tools by running:${NC}\n"
-    printf "    ${BOLD}xcode-select --install${NC}\n\n"
+    printf "\n  ${GREY}Triggering Xcode Command Line Tools installation…${NC}\n"
+    xcode-select --install >/dev/null 2>&1 || true
+    printf "  ${GREY}Please complete the Apple installer prompt and re-run this command.${NC}\n\n"
     exit 1
 fi
 ok "Prerequisites verified."
@@ -126,6 +127,7 @@ cat << EOF > "$TARGET_APP/Contents/Info.plist"
 EOF
 
 codesign --force --deep --sign - --requirements '=designated => identifier "'"$PLIST_LABEL"'"' "$TARGET_APP" >/dev/null 2>&1 || true
+xattr -dr com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
 ok "App bundle created."
 printf "\n"
 
