@@ -35,6 +35,25 @@ Built specifically for engineers, designers, and professionals tracking roles ac
 *   **Launch at Login**: 🚀 Starts automatically at system startup via macOS `SMAppService` and LaunchAgent.
 
 
+## 📦 Install
+
+The fastest way to install Jobs Monitor is to run the following one-liner in your **Terminal**:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/install-jobsmonitor.command)"
+```
+
+### Manual Installation (Fallback)
+If you prefer to download and run the installer script manually:
+
+1. **Download** [`install-jobsmonitor.command`](install-jobsmonitor.command) (open the file, then click **Download raw file**).
+2. Open **Terminal** (`⌘ + Space`, type `Terminal`, press Enter).
+3. Type `sh ` — that's **s**, **h**, then a **space**.
+4. **Drag** the downloaded `install-jobsmonitor.command` into the Terminal window.
+5. Press **Enter** to compile and launch **Jobs Monitor**.
+
+> **First time only:** The installer builds the application natively on your Mac so macOS Gatekeeper trusts it completely with no security warnings.
+
 ## 🍺 Install via Homebrew
 
 You can install **Jobs Monitor** using Homebrew:
@@ -47,18 +66,6 @@ To update via Homebrew in the future:
 ```bash
 brew upgrade --cask jobsmonitor
 ```
-
-## 📦 Install
-
-Install by running the installer in **Terminal**:
-
-1. **Download** [`install-jobsmonitor.command`](install-jobsmonitor.command) (open the file, then click **Download raw file**).
-2. Open **Terminal** (`⌘ + Space`, type `Terminal`, press Enter).
-3. Type `sh ` — that's **s**, **h**, then a **space**.
-4. **Drag** the downloaded `install-jobsmonitor.command` into the Terminal window.
-5. Press **Enter** to compile and launch **Jobs Monitor**.
-
-> **First time only:** The installer builds the application natively on your Mac so macOS Gatekeeper trusts it completely with no security warnings.
 
 ## ⚙️ How It Works
 
