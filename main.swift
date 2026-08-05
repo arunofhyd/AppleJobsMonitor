@@ -1495,8 +1495,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
     
     func checkForUpdates(silentIfCurrent: Bool) {
+        let now = Date()
+        if silentIfCurrent {
+            if let lastCheck = UserDefaults.standard.object(forKey: "lastUpdateCheckDate") as? Date,
+               now.timeIntervalSince(lastCheck) < 86400 {
+                return // Only check once per 24 hours on automatic launch
+            }
+        }
+        UserDefaults.standard.set(now, forKey: "lastUpdateCheckDate")
+
         URLCache.shared.removeAllCachedResponses()
-        let ts = Int(Date().timeIntervalSince1970)
+        let ts = Int(now.timeIntervalSince1970)
         let urlStr = VERSION_CHECK_URL.contains("?") ? "\(VERSION_CHECK_URL)&t=\(ts)" : "\(VERSION_CHECK_URL)?t=\(ts)"
         guard let url = URL(string: urlStr) else { return }
         var request = URLRequest(url: url)
