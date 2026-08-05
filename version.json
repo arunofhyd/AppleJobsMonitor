@@ -1,7 +1,14 @@
 {
-  "version": "2.1.5",
+  "version": "2.1.6",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.1.6",
+      "date": "2026-08-05",
+      "changes": [
+        "24-Hour Update Check Rate-Limiting: Automatic background launch update check now respects a strict 24-hour rate limit so it checks at most once per day without pestering."
+      ]
+    },
     {
       "version": "2.1.5",
       "date": "2026-08-03",
