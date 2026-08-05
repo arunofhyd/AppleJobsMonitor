@@ -145,7 +145,7 @@ pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 TARGET_APP="/Applications/$APP_NAME.app"
 INSTALLED=false
 
-if [ -w "/Applications" ]; then
+if [ "$1" != "--modal" ] && [ "$1" != "--gui" ] && [ -w "/Applications" ]; then
     rm -rf "$TARGET_APP" 2>/dev/null || true
     if cp -R "$APP_BUNDLE" "$TARGET_APP" 2>/dev/null; then
         INSTALLED=true
