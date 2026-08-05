@@ -89,21 +89,21 @@ else
     TARGET_APP="/Applications/$APP_NAME.app"
     pkill -x "$APP_NAME" 2>/dev/null || true
 fi
-rm -rf "$TARGET_APP"
+APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
+rm -rf "$APP_BUNDLE"
+mkdir -p "$APP_BUNDLE/Contents/MacOS"
+mkdir -p "$APP_BUNDLE/Contents/Resources"
 
-mkdir -p "$TARGET_APP/Contents/MacOS"
-mkdir -p "$TARGET_APP/Contents/Resources"
-
-cp "$BUILD_DIR/$APP_NAME" "$TARGET_APP/Contents/MacOS/$APP_NAME"
-chmod 755 "$TARGET_APP/Contents/MacOS/$APP_NAME"
+cp "$BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+chmod 755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 if [ -f "$BUILD_DIR/logo-jobsmonitor.png" ]; then
-    cp "$BUILD_DIR/logo-jobsmonitor.png" "$TARGET_APP/Contents/Resources/AppIcon.png"
+    cp "$BUILD_DIR/logo-jobsmonitor.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
 fi
 
-cat << EOF > "$TARGET_APP/Contents/Info.plist"
+cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://Apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
@@ -117,7 +117,7 @@ cat << EOF > "$TARGET_APP/Contents/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.1.5</string>
+    <string>2.1.6</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSUIElement</key>
@@ -126,55 +126,219 @@ cat << EOF > "$TARGET_APP/Contents/Info.plist"
 </plist>
 EOF
 
-codesign --force --deep --sign - --requirements '=designated => identifier "'"$PLIST_LABEL"'"' "$TARGET_APP" >/dev/null 2>&1 || true
-xattr -dr com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
+codesign --force --deep --sign - --requirements '=designated => identifier "'"$PLIST_LABEL"'"' "$APP_BUNDLE" >/dev/null 2>&1 || true
+xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
 ok "App bundle created."
 printf "\n"
 
 if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
+    mkdir -p "$OLDPWD/Build"
+    cp -R "$APP_BUNDLE" "$OLDPWD/Build/"
+    ok "CI mode detected. App copied to Build/$APP_NAME.app"
+    exit 0
+fi
+
+# ---- Step 5: Install to /Applications & setup LaunchAgent ----------------
+step "Installing Jobs Monitor to /Applications…"
+
+pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+TARGET_APP="/Applications/$APP_NAME.app"
+INSTALLED=false
+
+if [ -w "/Applications" ]; then
+    rm -rf "$TARGET_APP" 2>/dev/null || true
+    if cp -R "$APP_BUNDLE" "$TARGET_APP" 2>/dev/null; then
+        INSTALLED=true
+    fi
+fi
+
+setup_launch_agent() {
+    LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+    mkdir -p "$LAUNCH_AGENTS_DIR"
+    PLIST_PATH="$LAUNCH_AGENTS_DIR/$PLIST_LABEL.plist"
+    cat << EOF > "$PLIST_PATH"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>$PLIST_LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$TARGET_APP/Contents/MacOS/$APP_NAME</string>
+    </array>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><false/>
+</dict>
+</plist>
+EOF
+    defaults delete "$PLIST_LABEL" has_launched_jobsmonitor 2>/dev/null || true
+    pkill -9 -x "$APP_NAME" 2>/dev/null || true
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    launchctl load "$PLIST_PATH" 2>/dev/null || true
+    touch "$TARGET_APP"
+    open "$TARGET_APP" --args --open-preferences
+}
+
+if [ "$INSTALLED" = "true" ]; then
+    xattr -dr com.apple.quarantine "$TARGET_APP" >/dev/null 2>&1 || true
+    setup_launch_agent
+    ok "Jobs Monitor installed & running."
+    printf "\n"
     line
-    printf "${WHITE}${BOLD}   ✓ CI Build Complete: $TARGET_APP${NC}\n"
+    printf "${WHITE}${BOLD}   ✓ Jobs Monitor is installed and running in your menu bar.${NC}\n"
     line
     printf "\n"
     exit 0
 fi
 
-# ---- Step 5: Installing background agent & launching --------------------
-step "Installing background agent & launching app…"
-LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
-mkdir -p "$LAUNCH_AGENTS_DIR"
-PLIST_PATH="$LAUNCH_AGENTS_DIR/$PLIST_LABEL.plist"
+# Fallback: Open Drag Modal if elevated permission required
+warn "Standard install required elevated privileges. Opening installer modal…"
+cat > Installer.swift <<'INSTEOF'
+import Cocoa
+import QuartzCore
 
-cat << EOF > "$PLIST_PATH"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>$PLIST_LABEL</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>$TARGET_APP/Contents/MacOS/$APP_NAME</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <false/>
-</dict>
-</plist>
-EOF
+let appName = "Jobs Monitor"
+let sourcePath = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : ""
 
-# Reset first-launch flag so Preferences opens automatically after install
-defaults delete "$PLIST_LABEL" has_launched_jobsmonitor 2>/dev/null || true
-pkill -9 -x "$APP_NAME" 2>/dev/null || true
-launchctl unload "$PLIST_PATH" 2>/dev/null || true
-launchctl load "$PLIST_PATH" 2>/dev/null || true
-touch "$TARGET_APP"
-open "$TARGET_APP" --args --open-preferences
-ok "Jobs Monitor installed & running."
-printf "\n"
+func performInstallation(src: URL) -> Bool {
+    let dest = URL(fileURLWithPath: "/Applications").appendingPathComponent("Jobs Monitor.app")
+    do {
+        if FileManager.default.fileExists(atPath: dest.path) {
+            try FileManager.default.removeItem(at: dest)
+        }
+        try FileManager.default.copyItem(at: src, to: dest)
+    } catch {
+        let p = src.path.replacingOccurrences(of: "'", with: "'\\''")
+        let script = "do shell script \"rm -rf '/Applications/Jobs Monitor.app'; cp -R '\(p)' '/Applications/Jobs Monitor.app'\" with administrator privileges"
+        if let s = NSAppleScript(source: script) {
+            var err: NSDictionary?
+            s.executeAndReturnError(&err)
+            if err != nil { return false }
+        }
+    }
+    let clean = Process()
+    clean.launchPath = "/usr/bin/xattr"
+    clean.arguments = ["-dr", "com.apple.quarantine", dest.path]
+    clean.standardOutput = Pipe(); clean.standardError = Pipe()
+    try? clean.run(); clean.waitUntilExit()
 
-line
-printf "${WHITE}${BOLD}   ✓ Jobs Monitor is now installed and running in your menu bar.${NC}\n"
-line
+    NSSound(named: "Glass")?.play()
+    NSWorkspace.shared.open(dest)
+    NSApp.terminate(nil)
+    return true
+}
+
+class ActionTarget: NSObject {
+    @objc static func oneClickInstall() {
+        if !sourcePath.isEmpty {
+            let src = URL(fileURLWithPath: sourcePath)
+            _ = performInstallation(src: src)
+        }
+    }
+}
+
+class DragIcon: NSImageView, NSDraggingSource {
+    var fileURL: URL?
+    func draggingSession(_ s: NSDraggingSession, sourceOperationMaskFor c: NSDraggingContext) -> NSDragOperation { .copy }
+    override func mouseDown(with event: NSEvent) {
+        guard let url = fileURL, let originalImg = image else { return }
+        let item = NSPasteboardItem()
+        item.setString(url.absoluteString, forType: .fileURL)
+        let drag = NSDraggingItem(pasteboardWriter: item)
+        let dragImg = NSImage(size: bounds.size)
+        dragImg.lockFocus()
+        if let ctx = NSGraphicsContext.current { ctx.imageInterpolation = .high }
+        originalImg.draw(in: bounds)
+        dragImg.unlockFocus()
+        drag.setDraggingFrame(bounds, contents: dragImg)
+        beginDraggingSession(with: [drag], event: event, source: self)
+    }
+}
+
+class DropZone: NSImageView {
+    override init(frame f: NSRect) { super.init(frame: f); registerForDraggedTypes([.fileURL]) }
+    required init?(coder: NSCoder) { super.init(coder: coder); registerForDraggedTypes([.fileURL]) }
+    override func draggingEntered(_ s: NSDraggingInfo) -> NSDragOperation { .copy }
+    override func performDragOperation(_ s: NSDraggingInfo) -> Bool {
+        guard let str = s.draggingPasteboard.propertyList(forType: .fileURL) as? String,
+              let src = URL(string: str) else { return false }
+        return performInstallation(src: src)
+    }
+}
+
+let app = NSApplication.shared
+app.setActivationPolicy(.regular)
+
+let W: CGFloat = 620, H: CGFloat = 410
+let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: W, height: H), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+win.title = "Install Jobs Monitor"
+win.center()
+
+let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: W, height: H))
+bg.material = .windowBackground; bg.state = .active
+win.contentView = bg
+
+let title = NSTextField(labelWithString: "Install Jobs Monitor")
+title.frame = NSRect(x: 0, y: H - 65, width: W, height: 30)
+title.alignment = .center
+title.font = NSFont.systemFont(ofSize: 22, weight: .bold)
+bg.addSubview(title)
+
+let sub = NSTextField(labelWithString: "Drag Jobs Monitor to Applications or click Instant Install below")
+sub.frame = NSRect(x: 0, y: H - 90, width: W, height: 20)
+sub.alignment = .center
+sub.font = NSFont.systemFont(ofSize: 13)
+sub.textColor = .secondaryLabelColor
+bg.addSubview(sub)
+
+let iconSize: CGFloat = 128, midY: CGFloat = 145
+let appIcon = DragIcon(frame: NSRect(x: 90, y: midY, width: iconSize, height: iconSize))
+appIcon.imageScaling = .scaleProportionallyUpOrDown
+appIcon.image = NSWorkspace.shared.icon(forFile: sourcePath)
+appIcon.fileURL = URL(fileURLWithPath: sourcePath)
+bg.addSubview(appIcon)
+
+let appLabel = NSTextField(labelWithString: appName)
+appLabel.frame = NSRect(x: 90, y: midY - 26, width: iconSize, height: 18)
+appLabel.alignment = .center
+appLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+bg.addSubview(appLabel)
+
+let arrow = NSTextField(labelWithString: "➜")
+arrow.frame = NSRect(x: (W - 50)/2, y: midY + iconSize/2 - 24, width: 50, height: 40)
+arrow.alignment = .center
+arrow.font = NSFont.systemFont(ofSize: 32, weight: .regular)
+arrow.textColor = .secondaryLabelColor
+bg.addSubview(arrow)
+
+let drop = DropZone(frame: NSRect(x: W - 90 - iconSize, y: midY, width: iconSize, height: iconSize))
+drop.imageScaling = .scaleProportionallyUpOrDown
+let appsIcon = NSWorkspace.shared.icon(forFile: "/Applications")
+appsIcon.size = NSSize(width: 128, height: 128)
+drop.image = appsIcon
+bg.addSubview(drop)
+
+let appsLabel = NSTextField(labelWithString: "Applications")
+appsLabel.frame = NSRect(x: W - 90 - iconSize, y: midY - 26, width: iconSize, height: 18)
+appsLabel.alignment = .center
+appsLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+bg.addSubview(appsLabel)
+
+let installBtn = NSButton(frame: NSRect(x: (W - 250)/2, y: 35, width: 250, height: 40))
+installBtn.title = "⚡ One-Click Install to /Applications"
+installBtn.bezelStyle = .rounded
+installBtn.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+installBtn.target = ActionTarget.self
+installBtn.action = #selector(ActionTarget.oneClickInstall)
+bg.addSubview(installBtn)
+
+win.makeKeyAndOrderFront(nil)
+app.activate(ignoringOtherApps: true)
+app.run()
+INSTEOF
+
+if swiftc -O -o Installer Installer.swift -framework Cocoa >/dev/null 2>&1; then
+    ./Installer "$APP_BUNDLE"
+fi
+setup_launch_agent
 printf "\n"
