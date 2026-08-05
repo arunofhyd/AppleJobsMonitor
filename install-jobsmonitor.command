@@ -194,7 +194,7 @@ if [ "$INSTALLED" = "true" ]; then
 fi
 
 # Fallback: Open Drag Modal if elevated permission required
-warn "Standard install required elevated privileges. Opening installer modal…"
+printf "  ➔ Standard install required elevated privileges. Opening installer modal…\n"
 cat > Installer.swift <<'INSTEOF'
 import Cocoa
 import QuartzCore
@@ -210,8 +210,7 @@ func performInstallation(src: URL) -> Bool {
         }
         try FileManager.default.copyItem(at: src, to: dest)
     } catch {
-        let p = src.path.replacingOccurrences(of: "'", with: "'\\''")
-        let script = "do shell script \"rm -rf '/Applications/Jobs Monitor.app'; cp -R '\(p)' '/Applications/Jobs Monitor.app'\" with administrator privileges"
+        let script = "do shell script \"rm -rf '/Applications/Jobs Monitor.app'; cp -R '\(src.path)' '/Applications/Jobs Monitor.app'\" with administrator privileges"
         if let s = NSAppleScript(source: script) {
             var err: NSDictionary?
             s.executeAndReturnError(&err)
