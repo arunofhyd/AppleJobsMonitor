@@ -5,7 +5,7 @@ import SwiftUI
 import UserNotifications
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.1.6"
+let APP_VERSION = "2.1.7"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -537,14 +537,18 @@ func getUserFirstName() -> String {
 func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, locationTitle: String, searchUrl: String) -> String {
     var rows = ""
     for j in jobs {
+        let careersUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
         rows += """
         <tr>
           <td class="cell">
             <a href="\(j.url)" class="job-link">\(j.title)</a>
             <br><span class="text-muted">\(j.team)</span>
           </td>
-          <td class="cell">\(j.location)</td>
           <td class="cell text-muted">\(j.posted.isEmpty ? "—" : j.posted)</td>
+          <td class="cell">\(j.location)</td>
+          <td class="cell" style="text-align:right;">
+            <a href="\(careersUrl)" class="careers-btn" target="_blank">Careers ↗</a>
+          </td>
         </tr>
         """
     }
@@ -593,6 +597,24 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, 
       .cell { padding:16px 8px; border-bottom:1px solid var(--border); font-size:14px; }
       .job-link { color:var(--link); font-weight:600; text-decoration:none; font-size:15px; }
       .job-link:hover { text-decoration:underline; }
+      .careers-btn {
+        display: inline-block;
+        padding: 2px 8px;
+        background: transparent;
+        color: var(--link);
+        border: 1px solid var(--link);
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+        line-height: 1.2;
+      }
+      .careers-btn:hover {
+        background: var(--link);
+        color: var(--btn-text);
+        text-decoration: none;
+      }
       .text-muted { color:var(--text-sec); font-size:13px; }
       .btn-wrapper { margin-top:32px; text-align:center; }
       .btn { display:inline-block; background:var(--btn-bg); color:var(--btn-text); text-decoration:none; padding:12px 24px; border-radius:980px; font-size:15px; font-weight:600; }
@@ -608,20 +630,15 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, 
         <div class="content">
           <p class="greeting">\(greeting)</p>
           <table>
-            <thead><tr><th>Role</th><th>Location</th><th>Posted</th></tr></thead>
+            <thead><tr><th style="width: 50%;">Role</th><th style="width: 15%;">Posted</th><th style="width: 20%;">Location</th><th style="text-align:right; width: 15%;">PORTAL</th></tr></thead>
             <tbody>\(rows)</tbody>
           </table>
           <div class="btn-wrapper">
             <a href="\(searchUrl)" class="btn">View All Apple Jobs →</a>
           </div>
         </div>
-        <div style="padding: 24px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border);">
-          <strong style="color: var(--text-main); font-size: 14px;">How Jobs Monitor Works:</strong>
-          <ul style="margin: 12px 0 16px 0; padding-left: 20px; line-height: 1.6;">
-            <li><strong style="color: var(--text-main);">Runs Silently:</strong> Native macOS menu bar application running in the background.</li>
-            <li><strong style="color: var(--text-main);">Instant Notifications:</strong> Shows alerts instantly when new roles are posted.</li>
-            <li><strong style="color: var(--text-main);">Click-to-View:</strong> The browser dashboard opens only when you click "View Dashboard".</li>
-          </ul>
+        <div style="padding: 20px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
+          <strong style="color: var(--text-main);">Job Links:</strong> Clicking on the <strong style="color: var(--link);">job title</strong> takes you to the public jobs page, and clicking on the <span class="careers-btn" style="margin: 0 4px; pointer-events: none; padding: 1px 6px; font-size: 10px; display: inline-block; vertical-align: middle; position: relative; top: -1px;">Careers ↗</span> button takes you to the internal company posting if available.
         </div>
         <div class="footer">
           Jobs Monitor v\(APP_VERSION) · Built by Arun Thomas · Contact: \(CONTACT_EMAIL)<br>
@@ -630,6 +647,43 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, 
       </div>
     </body></html>
     """
+}
+
+// ── Date Parser Helper (Newest to Oldest Sorting) ──────────────────────────────
+func parsePostedDate(_ str: String) -> Date {
+    let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty { return Date.distantPast }
+    let lower = trimmed.lowercased()
+    if lower == "today" || lower == "just now" {
+        return Date()
+    } else if lower == "yesterday" {
+        return Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+    } else if lower.contains("day") && lower.contains("ago") {
+        let digits = lower.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+        if let days = Int(digits) {
+            return Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        }
+    }
+    
+    let formats = [
+        "yyyy-MM-dd'T'HH:mm:ssZ",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        "yyyy-MM-dd",
+        "MMM d, yyyy",
+        "MMMM d, yyyy",
+        "d MMM yyyy",
+        "d MMMM yyyy",
+        "MMM dd, yyyy"
+    ]
+    for fmt in formats {
+        let f = DateFormatter()
+        f.dateFormat = fmt
+        f.locale = Locale(identifier: "en_US_POSIX")
+        if let d = f.date(from: trimmed) {
+            return d
+        }
+    }
+    return Date.distantPast
 }
 
 // ── HTML Parser ────────────────────────────────────────────────────────────────
@@ -666,6 +720,7 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSe
     }
     
     // ── Location Intelligence Filter ──────────────────────────────────
+    var candidates: [JobItem] = rawResults
     if settings.locationMode == 0 {
         // Country Mode (e.g. India)
         let idx = max(0, min(settings.countryIndex, countryPresets.count - 1))
@@ -682,7 +737,7 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSe
             if targetCode.contains("gbr") && (locLower.contains("united kingdom") || locLower.contains("uk")) { return true }
             return false
         }
-        return filtered.isEmpty ? rawResults : filtered
+        if !filtered.isEmpty { candidates = filtered }
     } else if settings.locationMode == 1 {
         // City Mode (e.g. Bengaluru)
         let idx = max(0, min(settings.cityIndex, cityPresets.count - 1))
@@ -693,10 +748,18 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSe
             let cList = (job.cities ?? []).map { $0.lowercased() }
             return cList.contains(where: { $0.contains(targetCity) || targetCity.contains($0) }) || locLower.contains(targetCity)
         }
-        return filtered.isEmpty ? rawResults : filtered
+        if !filtered.isEmpty { candidates = filtered }
     }
     
-    return rawResults
+    // ── Sort Newest to Oldest by Posting Date ─────────────────────────
+    return candidates.sorted { j1, j2 in
+        let d1 = parsePostedDate(j1.posted)
+        let d2 = parsePostedDate(j2.posted)
+        if d1 != d2 {
+            return d1 > d2
+        }
+        return j1.id > j2.id
+    }
 }
 
 func normalizeJob(_ raw: [String: Any], defaultUrl: String) -> JobItem? {

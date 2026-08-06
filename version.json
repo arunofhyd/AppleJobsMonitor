@@ -1,7 +1,15 @@
 {
-  "version": "2.1.6",
+  "version": "2.1.7",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.1.7",
+      "date": "2026-08-06",
+      "changes": [
+        "Added dual portal Careers ↗ button linking directly to internal company posting URLs.",
+        "Added strict newest-to-oldest posting date sorting across all parsed job roles."
+      ]
+    },
     {
       "version": "2.1.6",
       "date": "2026-08-05",
