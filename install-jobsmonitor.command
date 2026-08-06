@@ -132,8 +132,9 @@ ok "App bundle created."
 printf "\n"
 
 if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
-    mkdir -p "$OLDPWD/Build"
-    cp -R "$APP_BUNDLE" "$OLDPWD/Build/"
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    mkdir -p "$SCRIPT_DIR/Build"
+    cp -R "$APP_BUNDLE" "$SCRIPT_DIR/Build/"
     ok "CI mode detected. App copied to Build/$APP_NAME.app"
     exit 0
 fi
