@@ -49,7 +49,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete "v${{ env.VERSION }}" --yes || true
+          gh release delete "v${{ env.VERSION }}" --yes --cleanup-tag || true
+          git tag -d "v${{ env.VERSION }}" 2>/dev/null || true
           gh release create "v${{ env.VERSION }}" JobsMonitor.zip \
             --title "v${{ env.VERSION }}" \
             --notes "${{ env.CHANGELOG }}" \
