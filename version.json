@@ -1,7 +1,17 @@
 {
-  "version": "2.1.7",
+  "version": "2.1.8",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.1.8",
+      "date": "2026-08-07",
+      "changes": [
+        "Custom Notification Sound Volume: Added 0%–100% volume slider with real-time percentage text and debounced sound preview.",
+        "Notification Style Preview: Added live preview button in Preferences to test System Banners and Mid-Screen Popups directly.",
+        "Expanded Active Roles: Multi-page search fetching now retrieves and displays up to 30 active roles on your dashboard.",
+        "Dashboard UI Polish: Renamed dashboard tab to JobsMonitor_dash.html, updated greeting, removed header subtext, and optimized table column widths to 65% for Role."
+      ]
+    },
     {
       "version": "2.1.7",
       "date": "2026-08-06",
