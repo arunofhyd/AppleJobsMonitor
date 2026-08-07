@@ -15,7 +15,7 @@ let COMMAND_DOWNLOAD_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMoni
 let appDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!.appendingPathComponent("JobsMonitor")
 let stateFile = appDir.appendingPathComponent("seen_jobs.json")
 let settingsFile = appDir.appendingPathComponent("settings.json")
-let dashboardFile = appDir.appendingPathComponent("dashboard.html")
+let dashboardFile = appDir.appendingPathComponent("JobsMonitor_dash.html")
 let logFile = appDir.appendingPathComponent("monitor.log")
 
 struct UpdateChangelogView: View {
@@ -541,7 +541,7 @@ func getUserFirstName() -> String {
 }
 
 // ── HTML Dashboard Generator ───────────────────────────────────────────────────
-func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, locationTitle: String, searchUrl: String) -> String {
+func generateDashboardHTML(jobs: [JobItem], greeting: String, locationTitle: String, searchUrl: String) -> String {
     var rows = ""
     for j in jobs {
         let careersUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
@@ -553,7 +553,7 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, 
           </td>
           <td class="cell text-muted">\(j.posted.isEmpty ? "—" : j.posted)</td>
           <td class="cell">\(j.location)</td>
-          <td class="cell" style="text-align:right;">
+          <td class="cell" style="text-align:right; padding-right: 8px;">
             <a href="\(careersUrl)" class="careers-btn" target="_blank">Careers ↗</a>
           </td>
         </tr>
@@ -596,7 +596,6 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, 
       .container { max-width:1200px; width:90%; margin:32px auto; background:var(--bg-card); border-radius:18px; overflow:hidden; border:1px solid var(--border); box-shadow:0 4px 24px rgba(0,0,0,0.04); }
       .header { background:var(--header-bg); padding:28px 32px; border-bottom:1px solid var(--border); }
       .header-title { color:var(--header-text); font-size:22px; font-weight:600; letter-spacing:-0.01em; }
-      .header-sub { color:var(--text-sec); font-size:13px; margin-top:4px; }
       .content { padding:28px 32px; }
       .greeting { font-size:16px; margin:0 0 20px; }
       table { width:100%; border-collapse:collapse; }
@@ -632,12 +631,11 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, subtitle: String, 
       <div class="container">
         <div class="header">
           <div class="header-title"> Jobs Monitor · \(locationTitle)</div>
-          <div class="header-sub">\(subtitle)</div>
         </div>
         <div class="content">
           <p class="greeting">\(greeting)</p>
           <table>
-            <thead><tr><th style="width: 50%;">Role</th><th style="width: 15%;">Posted</th><th style="width: 20%;">Location</th><th style="text-align:right; width: 15%;">PORTAL</th></tr></thead>
+            <thead><tr><th style="width: 40%;">Role</th><th style="width: 18%;">Posted</th><th style="width: 28%;">Location</th><th style="text-align:right; width: 14%; padding-right: 14px;">PORTAL</th></tr></thead>
             <tbody>\(rows)</tbody>
           </table>
           <div class="btn-wrapper">
@@ -1342,7 +1340,6 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         playNotificationSound(soundName, volume: vol)
         
         if style == 0 {
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
             let content = UNMutableNotificationContent()
             content.title = " Jobs Monitor (Banner Preview)"
             content.body = "This is a sample System Notification Banner! Banners appear in the upper-right corner of your screen."
@@ -2102,10 +2099,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 self.rebuildMenu()
                 
                 let firstName = getUserFirstName()
-                let greeting = "Hi \(firstName) 👋 — \(jobs.count) active roles currently tracked for <strong>\(settings.locationTitle)</strong>:"
+                let displayCount = min(20, jobs.count)
+                let greeting = "Hi \(firstName) 👋 — \(displayCount) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>:"
                 let htmlStr = generateDashboardHTML(jobs: jobs.isEmpty ? [] : Array(jobs.prefix(20)),
                                                      greeting: greeting,
-                                                     subtitle: "\(jobs.count) active openings",
                                                      locationTitle: settings.locationTitle,
                                                      searchUrl: settings.activeUrl)
                 
