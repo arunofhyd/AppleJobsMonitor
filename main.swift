@@ -1112,21 +1112,17 @@ class SettingsWindowController: NSWindowController {
         notificationStyleInfoBtn.toolTip = "Learn about Notification Delivery Styles"
         card4.addSubview(notificationStyleInfoBtn)
 
-        // Row 2: Sound Selector
+        // Row 2: Sound Selector (Auto-previews selected sound)
         let soundLabel = NSTextField(labelWithString: "Sound")
         soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         soundLabel.frame = NSRect(x: 20, y: 110, width: 155, height: 20)
         card4.addSubview(soundLabel)
         
-        soundPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 107, width: 286, height: 26))
+        soundPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 107, width: 407, height: 26))
         soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
+        soundPopUp.target = self
+        soundPopUp.action = #selector(soundPopUpChanged)
         card4.addSubview(soundPopUp)
-        
-        let previewBtn = NSButton(title: "▶ Preview", target: self, action: #selector(previewSound))
-        previewBtn.frame = NSRect(x: 477, y: 107, width: 115, height: 26)
-        previewBtn.bezelStyle = .rounded
-        previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        card4.addSubview(previewBtn)
 
         // Row 3: Sound Volume Control
         let volumeTitleLabel = NSTextField(labelWithString: "Volume")
@@ -1270,9 +1266,9 @@ class SettingsWindowController: NSWindowController {
         }
     }
 
-    @objc func previewSound() {
+    @objc func soundPopUpChanged(_ sender: NSPopUpButton) {
         volumePreviewTimer?.invalidate()
-        let idx = soundPopUp.indexOfSelectedItem
+        let idx = sender.indexOfSelectedItem
         if idx >= 0 && idx < availableSounds.count {
             playNotificationSound(availableSounds[idx].nameOrPath, volume: volumeSlider.floatValue)
         }
