@@ -1212,17 +1212,21 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
     }
 
-    private var activeModalWindow: NSWindow?
-
     @objc func closeInfoModal(_ sender: NSButton) {
         NSApp.stopModal()
-        activeModalWindow?.close()
-        activeModalWindow = nil
+        sender.window?.orderOut(nil)
     }
 
     func showCustomInfoModal(title: String, contentText: String, isMonospaced: Bool = false) {
-        let winWidth: CGFloat = 500
-        let winHeight: CGFloat = 340
+        let winWidth: CGFloat = 540
+        
+        // Calculate required text height so entire message is visible without scrolling
+        let font = isMonospaced ? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular) : NSFont.systemFont(ofSize: 12, weight: .regular)
+        let constraintRect = CGSize(width: winWidth - 68, height: .greatestFiniteMagnitude)
+        let boundingBox = (contentText as NSString).boundingRect(with: constraintRect, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font], context: nil)
+        let textContentHeight = max(110, min(400, ceil(boundingBox.height) + 24))
+        
+        let winHeight: CGFloat = 160 + textContentHeight
         
         let modalWin = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: winWidth, height: winHeight),
@@ -1258,16 +1262,16 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         titleLabel.frame = NSRect(x: 20, y: winHeight - 108, width: winWidth - 40, height: 22)
         contentView.addSubview(titleLabel)
         
-        // 3. Scrollable Content Area Box
-        let scrollView = NSScrollView(frame: NSRect(x: 24, y: 62, width: winWidth - 48, height: winHeight - 180))
+        // 3. Content Area Box (Sized so full text fits without scrolling!)
+        let scrollView = NSScrollView(frame: NSRect(x: 24, y: 58, width: winWidth - 48, height: textContentHeight))
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .bezelBorder
         
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: winWidth - 48, height: winHeight - 180))
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: winWidth - 48, height: textContentHeight))
         textView.isEditable = false
         textView.isSelectable = true
         textView.string = contentText
-        textView.font = isMonospaced ? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular) : NSFont.systemFont(ofSize: 12, weight: .regular)
+        textView.font = font
         textView.textColor = .labelColor
         
         scrollView.documentView = textView
@@ -1282,8 +1286,8 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         okBtn.keyEquivalent = "\r"
         contentView.addSubview(okBtn)
         
-        activeModalWindow = modalWin
         NSApp.runModal(for: modalWin)
+        modalWin.orderOut(nil)
     }
 
     @objc func showCustomUrlPreview() {
