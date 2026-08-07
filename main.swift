@@ -1282,7 +1282,7 @@ class SettingsWindowController: NSWindowController {
         countryPopUp.isEnabled = (sender.tag == 0)
         cityPopUp.isEnabled = (sender.tag == 1)
         customUrlField.isEnabled = (sender.tag == 2)
-        customUrlInstructionsBtn.isEnabled = (sender.tag == 2)
+        customUrlInstructionsBtn.isEnabled = true
     }
     
     @objc func dailyCheckToggled(_ sender: NSButton) {
@@ -1306,7 +1306,7 @@ class SettingsWindowController: NSWindowController {
         countryPopUp.isEnabled = (s.locationMode == 0)
         cityPopUp.isEnabled = (s.locationMode == 1)
         customUrlField.isEnabled = (s.locationMode == 2)
-        customUrlInstructionsBtn.isEnabled = (s.locationMode == 2)
+        customUrlInstructionsBtn.isEnabled = true
         
         countryPopUp.selectItem(at: (s.countryIndex >= 0 && s.countryIndex < countryPresets.count) ? s.countryIndex : 0)
         cityPopUp.selectItem(at: (s.cityIndex >= 0 && s.cityIndex < cityPresets.count) ? s.cityIndex : 0)
