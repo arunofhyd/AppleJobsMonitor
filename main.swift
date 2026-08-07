@@ -635,7 +635,7 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, locationTitle: Str
         <div class="content">
           <p class="greeting">\(greeting)</p>
           <table>
-            <thead><tr><th style="width: 40%;">Role</th><th style="width: 18%;">Posted</th><th style="width: 28%;">Location</th><th style="text-align:right; width: 14%; padding-right: 14px;">PORTAL</th></tr></thead>
+            <thead><tr><th style="width: 55%;">Role</th><th style="width: 15%;">Posted</th><th style="width: 18%;">Location</th><th style="text-align:right; width: 12%; padding-right: 18px;">PORTAL</th></tr></thead>
             <tbody>\(rows)</tbody>
           </table>
           <div class="btn-wrapper">
