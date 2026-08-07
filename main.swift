@@ -1216,16 +1216,18 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         let currentUrl = customUrlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         let alert = NSAlert()
         alert.messageText = "Full Custom Search URL"
-        alert.informativeText = currentUrl.isEmpty ? "No URL pasted yet. Select 'Custom URL' and paste a search link from jobs.apple.com." : "Full un-truncated URL:"
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         
-        if !currentUrl.isEmpty {
-            let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 440, height: 110))
+        if currentUrl.isEmpty {
+            alert.informativeText = "No URL pasted yet. Select 'Custom URL' and paste a search link from jobs.apple.com."
+        } else {
+            alert.informativeText = ""
+            let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 460, height: 110))
             scrollView.hasVerticalScroller = true
             scrollView.borderType = .bezelBorder
             
-            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 440, height: 110))
+            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 460, height: 110))
             textView.isEditable = false
             textView.isSelectable = true
             textView.string = currentUrl
@@ -1236,10 +1238,6 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             alert.accessoryView = scrollView
         }
         
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
-        if let img = NSImage(contentsOfFile: iconPath) {
-            alert.icon = img
-        }
         alert.runModal()
     }
 
