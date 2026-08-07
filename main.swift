@@ -1238,6 +1238,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             alert.accessoryView = scrollView
         }
         
+        alert.icon = NSImage(size: NSSize(width: 1, height: 1))
         alert.runModal()
     }
 
