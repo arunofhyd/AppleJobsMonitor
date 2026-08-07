@@ -936,6 +936,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     
     var intervalPopUp: NSPopUpButton!
     var notificationStylePopUp: NSPopUpButton!
+    var notificationStylePreviewBtn: NSButton!
     var notificationStyleInfoBtn: NSButton!
     var dismissLabel: NSTextField!
     var dismissPopUp: NSPopUpButton!
@@ -1109,12 +1110,19 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         styleLabel.frame = NSRect(x: 20, y: 154, width: 155, height: 20)
         card4.addSubview(styleLabel)
         
-        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 151, width: 363, height: 26))
+        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 151, width: 250, height: 26))
         notificationStylePopUp.addItems(withTitles: ["System Notification Banner", "Mid-Screen Popup Window"])
         notificationStylePopUp.target = self
         notificationStylePopUp.action = #selector(notificationStyleChanged)
         card4.addSubview(notificationStylePopUp)
         
+        notificationStylePreviewBtn = NSButton(title: "▶ Preview", target: self, action: #selector(previewNotificationStyle))
+        notificationStylePreviewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        notificationStylePreviewBtn.bezelStyle = .rounded
+        notificationStylePreviewBtn.frame = NSRect(x: 442, y: 150, width: 105, height: 26)
+        notificationStylePreviewBtn.toolTip = "Test current notification style and sound live"
+        card4.addSubview(notificationStylePreviewBtn)
+
         notificationStyleInfoBtn = NSButton(title: "?", target: self, action: #selector(showNotificationStyleInfo))
         notificationStyleInfoBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
         notificationStyleInfoBtn.bezelStyle = .rounded
@@ -1324,6 +1332,30 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         Delivers standard macOS system notifications in the upper-right corner of your screen. System notification banners adhere to your macOS Do Not Disturb schedule.
         """
         showCustomInfoModal(title: "Notification Delivery Styles", contentText: text, isMonospaced: false)
+    }
+
+    @objc func previewNotificationStyle() {
+        let style = notificationStylePopUp.indexOfSelectedItem
+        let soundName = soundPopUp.indexOfSelectedItem >= 0 && soundPopUp.indexOfSelectedItem < availableSounds.count ? availableSounds[soundPopUp.indexOfSelectedItem].nameOrPath : "Default"
+        let vol = volumeSlider.floatValue
+        
+        playNotificationSound(soundName, volume: vol)
+        
+        if style == 0 {
+            let content = UNMutableNotificationContent()
+            content.title = " Jobs Monitor (Banner Preview)"
+            content.body = "This is a sample System Notification Banner! Banners appear in the upper-right corner of your screen."
+            
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    logMessage("UNNotification error: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            let text = "This is a sample Mid-Screen Popup Window alert!\n\nMid-screen popup windows appear in the center of your screen to ensure urgent job postings are noticed immediately."
+            showCustomInfoModal(title: " Jobs Monitor (Popup Preview)", contentText: text, isMonospaced: false)
+        }
     }
 
     private var volumePreviewTimer: Timer?
