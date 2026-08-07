@@ -1224,9 +1224,10 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         let font = isMonospaced ? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular) : NSFont.systemFont(ofSize: 12, weight: .regular)
         let constraintRect = CGSize(width: winWidth - 68, height: .greatestFiniteMagnitude)
         let boundingBox = (contentText as NSString).boundingRect(with: constraintRect, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font], context: nil)
-        let textContentHeight = max(110, min(400, ceil(boundingBox.height) + 24))
+        let textContentHeight = max(110, min(420, ceil(boundingBox.height) + 24))
         
-        let winHeight: CGFloat = 160 + textContentHeight
+        // Total window height accounting for top/bottom margins, 64px logo, 24px title, and generous 20px gaps
+        let winHeight: CGFloat = textContentHeight + 216
         
         let modalWin = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: winWidth, height: winHeight),
@@ -1243,10 +1244,10 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         
         let contentView = modalWin.contentView!
         
-        // 1. Top Centered App Logo
+        // 1. Top Centered App Logo (y: winHeight - 88, height: 64, top padding: 24px)
         let logoSize: CGFloat = 64
         let logoX = (winWidth - logoSize) / 2.0
-        let logoView = NSImageView(frame: NSRect(x: logoX, y: winHeight - 78, width: logoSize, height: logoSize))
+        let logoView = NSImageView(frame: NSRect(x: logoX, y: winHeight - 88, width: logoSize, height: logoSize))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
             logoView.image = img
@@ -1255,15 +1256,15 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
         contentView.addSubview(logoView)
         
-        // 2. Centered Modal Title
+        // 2. Centered Modal Title (y: winHeight - 132, 20px gap below logo)
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = NSFont.systemFont(ofSize: 15, weight: .bold)
         titleLabel.alignment = .center
-        titleLabel.frame = NSRect(x: 20, y: winHeight - 108, width: winWidth - 40, height: 22)
+        titleLabel.frame = NSRect(x: 20, y: winHeight - 132, width: winWidth - 40, height: 24)
         contentView.addSubview(titleLabel)
         
-        // 3. Content Area Box (Sized so full text fits without scrolling!)
-        let scrollView = NSScrollView(frame: NSRect(x: 24, y: 58, width: winWidth - 48, height: textContentHeight))
+        // 3. Content Area Box (y: 64, top is winHeight - 152, giving 20px gap below title)
+        let scrollView = NSScrollView(frame: NSRect(x: 24, y: 64, width: winWidth - 48, height: textContentHeight))
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .bezelBorder
         
@@ -1277,11 +1278,11 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         scrollView.documentView = textView
         contentView.addSubview(scrollView)
         
-        // 4. Centered OK Button (exact size & rounded shape matching Cancel/Save Settings)
+        // 4. Centered OK Button (y: 16, height: 32, 16px gap below text box)
         let okBtnWidth: CGFloat = 100
         let okBtnX = (winWidth - okBtnWidth) / 2.0
         let okBtn = NSButton(title: "OK", target: self, action: #selector(closeInfoModal))
-        okBtn.frame = NSRect(x: okBtnX, y: 14, width: okBtnWidth, height: 32)
+        okBtn.frame = NSRect(x: okBtnX, y: 16, width: okBtnWidth, height: 32)
         okBtn.bezelStyle = .rounded
         okBtn.keyEquivalent = "\r"
         contentView.addSubview(okBtn)
