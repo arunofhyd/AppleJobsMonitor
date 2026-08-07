@@ -1247,6 +1247,8 @@ class SettingsWindowController: NSWindowController {
         alert.runModal()
     }
 
+    private var volumePreviewTimer: Timer?
+
     @objc func notificationStyleChanged(_ sender: NSPopUpButton) {
         let isPopup = (sender.indexOfSelectedItem == 1)
         dismissPopUp.isEnabled = isPopup
@@ -1256,13 +1258,20 @@ class SettingsWindowController: NSWindowController {
     @objc func volumeSliderChanged(_ sender: NSSlider) {
         let pct = Int(sender.floatValue * 100)
         volumeValueLabel.stringValue = "\(pct)%"
-        let idx = soundPopUp.indexOfSelectedItem
-        if idx >= 0 && idx < availableSounds.count {
-            playNotificationSound(availableSounds[idx].nameOrPath, volume: sender.floatValue)
+        
+        volumePreviewTimer?.invalidate()
+        let currentVol = sender.floatValue
+        volumePreviewTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            let idx = self.soundPopUp.indexOfSelectedItem
+            if idx >= 0 && idx < availableSounds.count {
+                playNotificationSound(availableSounds[idx].nameOrPath, volume: currentVol)
+            }
         }
     }
 
     @objc func previewSound() {
+        volumePreviewTimer?.invalidate()
         let idx = soundPopUp.indexOfSelectedItem
         if idx >= 0 && idx < availableSounds.count {
             playNotificationSound(availableSounds[idx].nameOrPath, volume: volumeSlider.floatValue)
@@ -1270,6 +1279,7 @@ class SettingsWindowController: NSWindowController {
     }
     
     @objc func cancelClicked() {
+        volumePreviewTimer?.invalidate()
         stopNotificationSound()
         window?.close()
     }
@@ -1425,6 +1435,7 @@ class SettingsWindowController: NSWindowController {
         s.launchAtLogin = launchLogin
         configureLaunchAtLogin(enabled: launchLogin)
         
+        volumePreviewTimer?.invalidate()
         stopNotificationSound()
         saveSettings(s)
         window?.close()
