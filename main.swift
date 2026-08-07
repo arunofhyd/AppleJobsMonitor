@@ -922,7 +922,7 @@ class SettingsCardView: NSView {
 }
 
 // ── Native Preferences Window ──────────────────────────────────────────────────
-class SettingsWindowController: NSWindowController {
+class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     var radioCountry: NSButton!
     var countryPopUp: NSPopUpButton!
     
@@ -931,6 +931,7 @@ class SettingsWindowController: NSWindowController {
     
     var radioCustom: NSButton!
     var customUrlField: NSTextField!
+    var customUrlPreviewBtn: NSButton!
     var customUrlInstructionsBtn: NSButton!
     
     var intervalPopUp: NSPopUpButton!
@@ -1022,11 +1023,20 @@ class SettingsWindowController: NSWindowController {
         radioCustom.tag = 2
         card1.addSubview(radioCustom)
         
-        customUrlField = NSTextField(frame: NSRect(x: 185, y: 16, width: 363, height: 26))
+        customUrlField = NSTextField(frame: NSRect(x: 185, y: 16, width: 326, height: 26))
         customUrlField.placeholderString = "https://jobs.apple.com/en-us/search?search=Python&location=india-INDC"
         customUrlField.font = NSFont.systemFont(ofSize: 12)
+        customUrlField.delegate = self
+        customUrlField.toolTip = "Paste a search URL from jobs.apple.com"
         card1.addSubview(customUrlField)
         
+        customUrlPreviewBtn = NSButton(title: "🔍", target: self, action: #selector(showCustomUrlPreview))
+        customUrlPreviewBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
+        customUrlPreviewBtn.bezelStyle = .rounded
+        customUrlPreviewBtn.frame = NSRect(x: 517, y: 15, width: 35, height: 26)
+        customUrlPreviewBtn.toolTip = "View full long URL in expanded window"
+        card1.addSubview(customUrlPreviewBtn)
+
         customUrlInstructionsBtn = NSButton(title: "?", target: self, action: #selector(showCustomUrlInstructions))
         customUrlInstructionsBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
         customUrlInstructionsBtn.bezelStyle = .rounded
@@ -1196,6 +1206,43 @@ class SettingsWindowController: NSWindowController {
         return header
     }
 
+    func controlTextDidChange(_ obj: Notification) {
+        if let tf = obj.object as? NSTextField, tf == customUrlField {
+            tf.toolTip = tf.stringValue.isEmpty ? "Paste a search URL from jobs.apple.com" : tf.stringValue
+        }
+    }
+
+    @objc func showCustomUrlPreview() {
+        let currentUrl = customUrlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let alert = NSAlert()
+        alert.messageText = "Full Custom Search URL"
+        alert.informativeText = currentUrl.isEmpty ? "No URL pasted yet. Select 'Custom URL' and paste a search link from jobs.apple.com." : "Full un-truncated URL:"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        
+        if !currentUrl.isEmpty {
+            let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 440, height: 110))
+            scrollView.hasVerticalScroller = true
+            scrollView.borderType = .bezelBorder
+            
+            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 440, height: 110))
+            textView.isEditable = false
+            textView.isSelectable = true
+            textView.string = currentUrl
+            textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+            textView.textColor = .labelColor
+            
+            scrollView.documentView = textView
+            alert.accessoryView = scrollView
+        }
+        
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        if let img = NSImage(contentsOfFile: iconPath) {
+            alert.icon = img
+        }
+        alert.runModal()
+    }
+
     @objc func showCustomUrlInstructions() {
         let alert = NSAlert()
         alert.messageText = "Custom Search URLs"
@@ -1318,6 +1365,7 @@ class SettingsWindowController: NSWindowController {
         cityPopUp.selectItem(at: (s.cityIndex >= 0 && s.cityIndex < cityPresets.count) ? s.cityIndex : 0)
         
         customUrlField.stringValue = s.customUrl
+        customUrlField.toolTip = s.customUrl.isEmpty ? "Paste a search URL from jobs.apple.com" : s.customUrl
         
         switch s.checkIntervalMinutes {
         case 5: intervalPopUp.selectItem(at: 0)
