@@ -2060,22 +2060,61 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     
     func performCheck(isManual: Bool) {
         let settings = loadSettings()
-        guard let url = URL(string: settings.activeUrl) else { return }
-        
+        let baseUrlStr = settings.activeUrl
         logMessage("Fetching roles for \(settings.locationTitle)...")
         
-        var request = URLRequest(url: url, timeoutInterval: 30)
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        var combinedJobs: [JobItem] = []
+        let group = DispatchGroup()
+        let lock = NSLock()
         
-        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self = self, let data = data, error == nil,
-                  let html = String(data: data, encoding: .utf8) else {
-                logMessage("Fetch error: \(error?.localizedDescription ?? "unknown")")
-                return
+        for page in 1...2 {
+            let sep = baseUrlStr.contains("?") ? "&" : "?"
+            let pageUrlStr = "\(baseUrlStr)\(sep)page=\(page)"
+            guard let url = URL(string: pageUrlStr) else { continue }
+            
+            var request = URLRequest(url: url, timeoutInterval: 30)
+            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+            
+            group.enter()
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                defer { group.leave() }
+                guard let data = data, error == nil,
+                      let html = String(data: data, encoding: .utf8) else {
+                    if let err = error {
+                        logMessage("Fetch page \(page) error: \(err.localizedDescription)")
+                    }
+                    return
+                }
+                
+                let pageJobs = parseJobsFromHTML(html, defaultSearchUrl: baseUrlStr, settings: settings)
+                lock.lock()
+                combinedJobs.append(contentsOf: pageJobs)
+                lock.unlock()
+            }.resume()
+        }
+        
+        group.notify(queue: .main) { [weak self] in
+            guard let self = self else { return }
+            
+            // Deduplicate combined jobs by ID while preserving order
+            var seen = Set<String>()
+            var uniqueJobs: [JobItem] = []
+            for j in combinedJobs {
+                if !seen.contains(j.id) {
+                    seen.insert(j.id)
+                    uniqueJobs.append(j)
+                }
             }
             
-            let jobs = parseJobsFromHTML(html, defaultSearchUrl: settings.activeUrl, settings: settings)
-            logMessage("Fetched \(jobs.count) roles for \(settings.locationTitle)")
+            // Sort newest to oldest by posting date
+            let jobs = uniqueJobs.sorted { j1, j2 in
+                let d1 = parsePostedDate(j1.posted)
+                let d2 = parsePostedDate(j2.posted)
+                if d1 != d2 { return d1 > d2 }
+                return j1.id > j2.id
+            }
+            
+            logMessage("Fetched \(jobs.count) total roles for \(settings.locationTitle)")
             
             var state = loadStateData()
             let isFirstRun = state.seen_ids.isEmpty
@@ -2089,40 +2128,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             state.last_checked_str = timeStr
             state.last_job_count = jobs.count
             
-            DispatchQueue.main.async {
-                let currentUnread = (state.unread_count ?? 0) + newJobs.count
-                state.unread_count = currentUnread
-                state.seen_ids = Array(Set(state.seen_ids + jobs.map { $0.id }))
-                saveStateData(state)
-                
-                self.updateBadge(unreadCount: currentUnread)
-                self.rebuildMenu()
-                
-                let firstName = getUserFirstName()
-                let displayCount = min(30, jobs.count)
-                let greeting = "Hi \(firstName) 👋 — \(displayCount) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>:"
-                let htmlStr = generateDashboardHTML(jobs: jobs.isEmpty ? [] : Array(jobs.prefix(30)),
-                                                     greeting: greeting,
-                                                     locationTitle: settings.locationTitle,
-                                                     searchUrl: settings.activeUrl)
-                
-                try? htmlStr.write(to: dashboardFile, atomically: true, encoding: .utf8)
-                
-                if !newJobs.isEmpty {
-                    let plural = newJobs.count > 1 ? "s" : ""
-                    self.showNativeAlert(
-                        title: " \(newJobs.count) New Apple Job\(plural)!",
-                        message: "\(newJobs.count) brand new role\(plural) posted for \(settings.locationTitle)!"
-                    )
-                } else if isManual {
-                    self.showNativeAlert(
-                        title: " Jobs Monitor (\(settings.locationTitle))",
-                        message: "No new openings since last check. Dashboard is ready with latest \(jobs.count) roles!"
-                    )
-                }
+            let currentUnread = (state.unread_count ?? 0) + newJobs.count
+            state.unread_count = currentUnread
+            state.seen_ids = Array(Set(state.seen_ids + jobs.map { $0.id }))
+            saveStateData(state)
+            
+            self.updateBadge(unreadCount: currentUnread)
+            self.rebuildMenu()
+            
+            let firstName = getUserFirstName()
+            let displayCount = min(30, jobs.count)
+            let greeting = "Hi \(firstName) 👋 — \(displayCount) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>:"
+            let htmlStr = generateDashboardHTML(jobs: jobs.isEmpty ? [] : Array(jobs.prefix(30)),
+                                                 greeting: greeting,
+                                                 locationTitle: settings.locationTitle,
+                                                 searchUrl: settings.activeUrl)
+            
+            try? htmlStr.write(to: dashboardFile, atomically: true, encoding: .utf8)
+            
+            if !newJobs.isEmpty {
+                let plural = newJobs.count > 1 ? "s" : ""
+                self.showNativeAlert(
+                    title: " \(newJobs.count) New Apple Job\(plural)!",
+                    message: "\(newJobs.count) brand new role\(plural) posted for \(settings.locationTitle)!"
+                )
+            } else if isManual {
+                self.showNativeAlert(
+                    title: " Jobs Monitor (\(settings.locationTitle))",
+                    message: "No new openings since last check. Dashboard is ready with latest \(jobs.count) roles!"
+                )
             }
         }
-        task.resume()
     }
     
     func showNativeAlert(title: String, message: String) {
