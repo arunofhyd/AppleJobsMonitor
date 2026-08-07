@@ -231,16 +231,19 @@ func stopNotificationSound() {
     activeSound = nil
 }
 
-func playNotificationSound(_ nameOrPath: String) {
+func playNotificationSound(_ nameOrPath: String, volume: Float = 1.0) {
     stopNotificationSound()
     guard !nameOrPath.isEmpty else { return }
+    let vol = max(0.0, min(1.0, volume))
     if nameOrPath.hasPrefix("/") {
         if let sound = NSSound(contentsOfFile: nameOrPath, byReference: true) {
+            sound.volume = vol
             activeSound = sound
             sound.play()
         }
     } else {
         if let sound = NSSound(named: NSSound.Name(nameOrPath)) {
+            sound.volume = vol
             activeSound = sound
             sound.play()
         }
@@ -270,6 +273,7 @@ struct AppSettings: Codable {
     var checkIntervalMinutes: Int // 5, 15, 30, 60, 120, 240, 360, 720, 1440
     var popupDismissSeconds: Int // 10, 30, 60, 180, 300, 600, 0
     var notificationSound: String // system sound name, or "" for none
+    var notificationVolume: Float // 0.0 to 1.0 (default 1.0)
     var notificationStyle: Int // 0: System Side Notification (Banner), 1: Mid-Screen Window (Popup Alert - Default)
     var enableDailyCheck: Bool
     var dailyCheckHour: Int // 0..23
@@ -278,10 +282,10 @@ struct AppSettings: Codable {
     var launchAtLogin: Bool
     
     enum CodingKeys: String, CodingKey {
-        case locationMode, countryIndex, cityIndex, customUrl, checkIntervalMinutes, popupDismissSeconds, notificationSound, notificationStyle, enableDailyCheck, dailyCheckHour, dailyCheckMinute, activeDays, launchAtLogin
+        case locationMode, countryIndex, cityIndex, customUrl, checkIntervalMinutes, popupDismissSeconds, notificationSound, notificationVolume, notificationStyle, enableDailyCheck, dailyCheckHour, dailyCheckMinute, activeDays, launchAtLogin
     }
     
-    init(locationMode: Int, countryIndex: Int, cityIndex: Int, customUrl: String, checkIntervalMinutes: Int, popupDismissSeconds: Int, notificationSound: String, notificationStyle: Int = 1, enableDailyCheck: Bool, dailyCheckHour: Int, dailyCheckMinute: Int, activeDays: [Bool], launchAtLogin: Bool) {
+    init(locationMode: Int, countryIndex: Int, cityIndex: Int, customUrl: String, checkIntervalMinutes: Int, popupDismissSeconds: Int, notificationSound: String, notificationVolume: Float = 1.0, notificationStyle: Int = 1, enableDailyCheck: Bool, dailyCheckHour: Int, dailyCheckMinute: Int, activeDays: [Bool], launchAtLogin: Bool) {
         self.locationMode = locationMode
         self.countryIndex = countryIndex
         self.cityIndex = cityIndex
@@ -289,6 +293,7 @@ struct AppSettings: Codable {
         self.checkIntervalMinutes = checkIntervalMinutes
         self.popupDismissSeconds = popupDismissSeconds
         self.notificationSound = notificationSound
+        self.notificationVolume = notificationVolume
         self.notificationStyle = notificationStyle
         self.enableDailyCheck = enableDailyCheck
         self.dailyCheckHour = dailyCheckHour
@@ -306,6 +311,7 @@ struct AppSettings: Codable {
         checkIntervalMinutes = try container.decodeIfPresent(Int.self, forKey: .checkIntervalMinutes) ?? 120
         popupDismissSeconds = try container.decodeIfPresent(Int.self, forKey: .popupDismissSeconds) ?? 300
         notificationSound = try container.decodeIfPresent(String.self, forKey: .notificationSound) ?? "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Bulletin.m4r"
+        notificationVolume = try container.decodeIfPresent(Float.self, forKey: .notificationVolume) ?? 1.0
         notificationStyle = try container.decodeIfPresent(Int.self, forKey: .notificationStyle) ?? 1
         enableDailyCheck = try container.decodeIfPresent(Bool.self, forKey: .enableDailyCheck) ?? true
         dailyCheckHour = try container.decodeIfPresent(Int.self, forKey: .dailyCheckHour) ?? 10
@@ -323,6 +329,7 @@ struct AppSettings: Codable {
             checkIntervalMinutes: 120,
             popupDismissSeconds: 300,
             notificationSound: "/System/Library/PrivateFrameworks/ToneLibrary.framework/Versions/A/Resources/Ringtones/Bulletin.m4r",
+            notificationVolume: 1.0,
             notificationStyle: 1,
             enableDailyCheck: true,
             dailyCheckHour: 10,
@@ -929,8 +936,11 @@ class SettingsWindowController: NSWindowController {
     var intervalPopUp: NSPopUpButton!
     var notificationStylePopUp: NSPopUpButton!
     var notificationStyleInfoBtn: NSButton!
+    var dismissLabel: NSTextField!
     var dismissPopUp: NSPopUpButton!
     var soundPopUp: NSPopUpButton!
+    var volumeSlider: NSSlider!
+    var volumeValueLabel: NSTextField!
     
     var dailyCheckCheckbox: NSButton!
     var timePopUp: NSPopUpButton!
@@ -940,9 +950,9 @@ class SettingsWindowController: NSWindowController {
     
     var onSave: (() -> Void)?
     
-        convenience init() {
+    convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 660, height: 775),
+            contentRect: NSRect(x: 0, y: 0, width: 660, height: 825),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -963,7 +973,7 @@ class SettingsWindowController: NSWindowController {
         guard let contentView = window?.contentView else { return }
         
         // ── Top Header Banner (Centralized Logo Only) ─────────────────
-        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 685, width: 660, height: 90))
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 735, width: 660, height: 90))
         
         let iconView = NSImageView(frame: NSRect(x: 298, y: 13, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -980,8 +990,8 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(headerView)
         
-        // ── Card 1: Target Location (y: 510, height: 165) ────────────
-        let card1 = createCardView(frame: NSRect(x: 24, y: 510, width: 612, height: 165))
+        // ── Card 1: Target Location (y: 560, height: 165) ────────────
+        let card1 = createCardView(frame: NSRect(x: 24, y: 560, width: 612, height: 165))
         
         let card1Title = createSectionHeader(title: "Target Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 132, width: 580, height: 22))
         card1.addSubview(card1Title)
@@ -1026,8 +1036,8 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card1)
         
-        // ── Card 2: Refresh Frequency (y: 410, height: 85) ─────────
-        let card2 = createCardView(frame: NSRect(x: 24, y: 410, width: 612, height: 85))
+        // ── Card 2: Refresh Frequency (y: 460, height: 85) ─────────
+        let card2 = createCardView(frame: NSRect(x: 24, y: 460, width: 612, height: 85))
         
         let card2Title = createSectionHeader(title: "Refresh Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 52, width: 580, height: 22))
         card2.addSubview(card2Title)
@@ -1043,8 +1053,8 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card2)
         
-        // ── Card 3: Daily Summary (y: 260, height: 135) ─────────────
-        let card3 = createCardView(frame: NSRect(x: 24, y: 260, width: 612, height: 135))
+        // ── Card 3: Daily Summary (y: 310, height: 135) ─────────────
+        let card3 = createCardView(frame: NSRect(x: 24, y: 310, width: 612, height: 135))
         
         let card3Title = createSectionHeader(title: "Daily Summary", iconName: "calendar.badge.clock", frame: NSRect(x: 16, y: 100, width: 580, height: 22))
         card3.addSubview(card3Title)
@@ -1077,51 +1087,70 @@ class SettingsWindowController: NSWindowController {
         
         contentView.addSubview(card3)
         
-        // ── Card 4: Alerts & Notifications (y: 70, height: 175) ──────
-        let card4 = createCardView(frame: NSRect(x: 24, y: 70, width: 612, height: 175))
+        // ── Card 4: Alerts & Notifications (y: 65, height: 230) ──────
+        let card4 = createCardView(frame: NSRect(x: 24, y: 65, width: 612, height: 230))
         
-        let card4Title = createSectionHeader(title: "Alerts & Notifications", iconName: "bell.fill", frame: NSRect(x: 16, y: 140, width: 580, height: 22))
+        let card4Title = createSectionHeader(title: "Alerts & Notifications", iconName: "bell.fill", frame: NSRect(x: 16, y: 194, width: 580, height: 22))
         card4.addSubview(card4Title)
         
-        // Notification Style setting
+        // Row 1: Notification Style setting
         let styleLabel = NSTextField(labelWithString: "Notification Style")
         styleLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        styleLabel.frame = NSRect(x: 20, y: 100, width: 155, height: 20)
+        styleLabel.frame = NSRect(x: 20, y: 154, width: 155, height: 20)
         card4.addSubview(styleLabel)
         
-        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 97, width: 376, height: 26))
+        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 151, width: 376, height: 26))
         notificationStylePopUp.addItems(withTitles: ["System Notification Banner", "Mid-Screen Popup Window"])
+        notificationStylePopUp.target = self
+        notificationStylePopUp.action = #selector(notificationStyleChanged)
         card4.addSubview(notificationStylePopUp)
         
         notificationStyleInfoBtn = NSButton(title: "?", target: self, action: #selector(showNotificationStyleInfo))
         notificationStyleInfoBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
         notificationStyleInfoBtn.bezelStyle = .rounded
-        notificationStyleInfoBtn.frame = NSRect(x: 567, y: 96, width: 38, height: 26)
+        notificationStyleInfoBtn.frame = NSRect(x: 567, y: 150, width: 38, height: 26)
         notificationStyleInfoBtn.toolTip = "Learn about Notification Delivery Styles"
         card4.addSubview(notificationStyleInfoBtn)
 
-        // Sound and Dismiss alert
+        // Row 2: Sound Selector
         let soundLabel = NSTextField(labelWithString: "Sound")
         soundLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        soundLabel.frame = NSRect(x: 20, y: 58, width: 155, height: 20)
+        soundLabel.frame = NSRect(x: 20, y: 110, width: 155, height: 20)
         card4.addSubview(soundLabel)
         
-        soundPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 55, width: 300, height: 26))
+        soundPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 107, width: 300, height: 26))
         soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
         card4.addSubview(soundPopUp)
         
         let previewBtn = NSButton(title: "▶ Preview", target: self, action: #selector(previewSound))
-        previewBtn.frame = NSRect(x: 490, y: 55, width: 115, height: 26)
+        previewBtn.frame = NSRect(x: 490, y: 107, width: 115, height: 26)
         previewBtn.bezelStyle = .rounded
         previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         card4.addSubview(previewBtn)
+
+        // Row 3: Sound Volume Control
+        let volumeTitleLabel = NSTextField(labelWithString: "Volume")
+        volumeTitleLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        volumeTitleLabel.frame = NSRect(x: 20, y: 66, width: 155, height: 20)
+        card4.addSubview(volumeTitleLabel)
+
+        volumeSlider = NSSlider(value: 1.0, minValue: 0.0, maxValue: 1.0, target: self, action: #selector(volumeSliderChanged))
+        volumeSlider.frame = NSRect(x: 185, y: 64, width: 320, height: 24)
+        card4.addSubview(volumeSlider)
+
+        volumeValueLabel = NSTextField(labelWithString: "100%")
+        volumeValueLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        volumeValueLabel.textColor = .secondaryLabelColor
+        volumeValueLabel.frame = NSRect(x: 512, y: 66, width: 90, height: 20)
+        card4.addSubview(volumeValueLabel)
         
-        let dismissLabel = NSTextField(labelWithString: "Dismiss alert after")
+        // Row 4: Dismiss Popup Window Alert
+        dismissLabel = NSTextField(labelWithString: "Dismiss popup after")
         dismissLabel.font = NSFont.systemFont(ofSize: 13, weight: .regular)
-        dismissLabel.frame = NSRect(x: 20, y: 18, width: 155, height: 20)
+        dismissLabel.frame = NSRect(x: 20, y: 22, width: 155, height: 20)
         card4.addSubview(dismissLabel)
         
-        dismissPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 15, width: 420, height: 26))
+        dismissPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 19, width: 420, height: 26))
         dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
         card4.addSubview(dismissPopUp)
         
@@ -1218,10 +1247,25 @@ class SettingsWindowController: NSWindowController {
         alert.runModal()
     }
 
+    @objc func notificationStyleChanged(_ sender: NSPopUpButton) {
+        let isPopup = (sender.indexOfSelectedItem == 1)
+        dismissPopUp.isEnabled = isPopup
+        dismissLabel.textColor = isPopup ? .labelColor : .secondaryLabelColor
+    }
+
+    @objc func volumeSliderChanged(_ sender: NSSlider) {
+        let pct = Int(sender.floatValue * 100)
+        volumeValueLabel.stringValue = "\(pct)%"
+        let idx = soundPopUp.indexOfSelectedItem
+        if idx >= 0 && idx < availableSounds.count {
+            playNotificationSound(availableSounds[idx].nameOrPath, volume: sender.floatValue)
+        }
+    }
+
     @objc func previewSound() {
         let idx = soundPopUp.indexOfSelectedItem
         if idx >= 0 && idx < availableSounds.count {
-            playNotificationSound(availableSounds[idx].nameOrPath)
+            playNotificationSound(availableSounds[idx].nameOrPath, volume: volumeSlider.floatValue)
         }
     }
     
@@ -1284,6 +1328,7 @@ class SettingsWindowController: NSWindowController {
         
         // Notification Style (Default: 1 - Mid-Screen Popup Window)
         notificationStylePopUp.selectItem(at: s.notificationStyle == 0 ? 0 : 1)
+        notificationStyleChanged(notificationStylePopUp)
         
         switch s.popupDismissSeconds {
         case 10: dismissPopUp.selectItem(at: 0)
@@ -1295,7 +1340,7 @@ class SettingsWindowController: NSWindowController {
         default: dismissPopUp.selectItem(at: 4)
         }
         
-        // Notification Sound
+        // Notification Sound & Volume
         let savedSound = s.notificationSound
         if let idx = availableSounds.firstIndex(where: { $0.nameOrPath == savedSound || $0.title == savedSound }) {
             soundPopUp.selectItem(at: idx)
@@ -1304,6 +1349,9 @@ class SettingsWindowController: NSWindowController {
         } else {
             soundPopUp.selectItem(at: 1)
         }
+        
+        volumeSlider.floatValue = s.notificationVolume
+        volumeValueLabel.stringValue = "\(Int(s.notificationVolume * 100))%"
         
         dailyCheckCheckbox.state = s.enableDailyCheck ? .on : .off
         timePopUp.isEnabled = s.enableDailyCheck
@@ -1357,8 +1405,12 @@ class SettingsWindowController: NSWindowController {
         default: s.popupDismissSeconds = 300
         }
         
-        // Notification Sound
+        // Notification Sound & Volume
         let selectedSoundIdx = soundPopUp.indexOfSelectedItem
+        if selectedSoundIdx >= 0 && selectedSoundIdx < availableSounds.count {
+            s.notificationSound = availableSounds[selectedSoundIdx].nameOrPath
+        }
+        s.notificationVolume = volumeSlider.floatValue
         if selectedSoundIdx >= 0 && selectedSoundIdx < availableSounds.count {
             s.notificationSound = availableSounds[selectedSoundIdx].nameOrPath
         }
@@ -1925,7 +1977,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let settings = loadSettings()
         
         // Play custom notification sound if configured
-        playNotificationSound(settings.notificationSound)
+        playNotificationSound(settings.notificationSound, volume: settings.notificationVolume)
         
         if settings.notificationStyle == 0 {
             // ── System Side Notification (Respects DND) ──────────────────
