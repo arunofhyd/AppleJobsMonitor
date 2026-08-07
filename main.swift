@@ -1002,7 +1002,7 @@ class SettingsWindowController: NSWindowController {
         radioCountry.tag = 0
         card1.addSubview(radioCountry)
         
-        countryPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 91, width: 420, height: 26))
+        countryPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 91, width: 407, height: 26))
         countryPopUp.addItems(withTitles: countryPresets.map { $0.name })
         card1.addSubview(countryPopUp)
         
@@ -1012,7 +1012,7 @@ class SettingsWindowController: NSWindowController {
         radioCity.tag = 1
         card1.addSubview(radioCity)
         
-        cityPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 53, width: 420, height: 26))
+        cityPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 53, width: 407, height: 26))
         cityPopUp.addItems(withTitles: cityPresets.map { $0.name })
         card1.addSubview(cityPopUp)
         
@@ -1022,7 +1022,7 @@ class SettingsWindowController: NSWindowController {
         radioCustom.tag = 2
         card1.addSubview(radioCustom)
         
-        customUrlField = NSTextField(frame: NSRect(x: 185, y: 16, width: 376, height: 26))
+        customUrlField = NSTextField(frame: NSRect(x: 185, y: 16, width: 363, height: 26))
         customUrlField.placeholderString = "https://jobs.apple.com/en-us/search?search=Python&location=india-INDC"
         customUrlField.font = NSFont.systemFont(ofSize: 12)
         card1.addSubview(customUrlField)
@@ -1030,7 +1030,7 @@ class SettingsWindowController: NSWindowController {
         customUrlInstructionsBtn = NSButton(title: "?", target: self, action: #selector(showCustomUrlInstructions))
         customUrlInstructionsBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
         customUrlInstructionsBtn.bezelStyle = .rounded
-        customUrlInstructionsBtn.frame = NSRect(x: 567, y: 15, width: 38, height: 26)
+        customUrlInstructionsBtn.frame = NSRect(x: 554, y: 15, width: 38, height: 26)
         customUrlInstructionsBtn.toolTip = "How to use Custom Search URLs"
         card1.addSubview(customUrlInstructionsBtn)
         
@@ -1047,7 +1047,7 @@ class SettingsWindowController: NSWindowController {
         intervalLabel.frame = NSRect(x: 20, y: 18, width: 155, height: 20)
         card2.addSubview(intervalLabel)
         
-        intervalPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 15, width: 420, height: 26))
+        intervalPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 15, width: 407, height: 26))
         intervalPopUp.addItems(withTitles: ["5 Minutes", "15 Minutes", "30 Minutes", "1 Hour", "2 Hours", "4 Hours", "6 Hours", "12 Hours", "24 Hours"])
         card2.addSubview(intervalPopUp)
         
@@ -1064,12 +1064,12 @@ class SettingsWindowController: NSWindowController {
         dailyCheckCheckbox.frame = NSRect(x: 20, y: 58, width: 155, height: 22)
         card3.addSubview(dailyCheckCheckbox)
         
-        timePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 55, width: 420, height: 26))
+        timePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 55, width: 407, height: 26))
         timePopUp.addItems(withTitles: timeOptions.map { $0.title })
         card3.addSubview(timePopUp)
         
         let startX: CGFloat = 185
-        let totalW: CGFloat = 420.0
+        let totalW: CGFloat = 407.0
         let spacing: CGFloat = 4.0
         let btnWidth: CGFloat = (totalW - 6.0 * spacing) / 7.0
         
@@ -1099,7 +1099,7 @@ class SettingsWindowController: NSWindowController {
         styleLabel.frame = NSRect(x: 20, y: 154, width: 155, height: 20)
         card4.addSubview(styleLabel)
         
-        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 151, width: 376, height: 26))
+        notificationStylePopUp = NSPopUpButton(frame: NSRect(x: 185, y: 151, width: 363, height: 26))
         notificationStylePopUp.addItems(withTitles: ["System Notification Banner", "Mid-Screen Popup Window"])
         notificationStylePopUp.target = self
         notificationStylePopUp.action = #selector(notificationStyleChanged)
@@ -1108,7 +1108,7 @@ class SettingsWindowController: NSWindowController {
         notificationStyleInfoBtn = NSButton(title: "?", target: self, action: #selector(showNotificationStyleInfo))
         notificationStyleInfoBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
         notificationStyleInfoBtn.bezelStyle = .rounded
-        notificationStyleInfoBtn.frame = NSRect(x: 567, y: 150, width: 38, height: 26)
+        notificationStyleInfoBtn.frame = NSRect(x: 554, y: 150, width: 38, height: 26)
         notificationStyleInfoBtn.toolTip = "Learn about Notification Delivery Styles"
         card4.addSubview(notificationStyleInfoBtn)
 
@@ -1118,12 +1118,12 @@ class SettingsWindowController: NSWindowController {
         soundLabel.frame = NSRect(x: 20, y: 110, width: 155, height: 20)
         card4.addSubview(soundLabel)
         
-        soundPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 107, width: 300, height: 26))
+        soundPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 107, width: 286, height: 26))
         soundPopUp.addItems(withTitles: availableSounds.map { $0.title })
         card4.addSubview(soundPopUp)
         
         let previewBtn = NSButton(title: "▶ Preview", target: self, action: #selector(previewSound))
-        previewBtn.frame = NSRect(x: 490, y: 107, width: 115, height: 26)
+        previewBtn.frame = NSRect(x: 477, y: 107, width: 115, height: 26)
         previewBtn.bezelStyle = .rounded
         previewBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         card4.addSubview(previewBtn)
@@ -1135,13 +1135,13 @@ class SettingsWindowController: NSWindowController {
         card4.addSubview(volumeTitleLabel)
 
         volumeSlider = NSSlider(value: 1.0, minValue: 0.0, maxValue: 1.0, target: self, action: #selector(volumeSliderChanged))
-        volumeSlider.frame = NSRect(x: 185, y: 64, width: 320, height: 24)
+        volumeSlider.frame = NSRect(x: 185, y: 64, width: 340, height: 24)
         card4.addSubview(volumeSlider)
 
         volumeValueLabel = NSTextField(labelWithString: "100%")
         volumeValueLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         volumeValueLabel.textColor = .secondaryLabelColor
-        volumeValueLabel.frame = NSRect(x: 512, y: 66, width: 90, height: 20)
+        volumeValueLabel.frame = NSRect(x: 532, y: 66, width: 60, height: 20)
         card4.addSubview(volumeValueLabel)
         
         // Row 4: Dismiss Popup Window Alert
@@ -1150,7 +1150,7 @@ class SettingsWindowController: NSWindowController {
         dismissLabel.frame = NSRect(x: 20, y: 22, width: 155, height: 20)
         card4.addSubview(dismissLabel)
         
-        dismissPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 19, width: 420, height: 26))
+        dismissPopUp = NSPopUpButton(frame: NSRect(x: 185, y: 19, width: 407, height: 26))
         dismissPopUp.addItems(withTitles: ["10 Seconds", "30 Seconds", "1 Minute", "3 Minutes", "5 Minutes", "10 Minutes", "Do Not Auto-Dismiss"])
         card4.addSubview(dismissPopUp)
         
