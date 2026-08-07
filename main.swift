@@ -2099,9 +2099,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 self.rebuildMenu()
                 
                 let firstName = getUserFirstName()
-                let displayCount = min(20, jobs.count)
+                let displayCount = min(30, jobs.count)
                 let greeting = "Hi \(firstName) 👋 — \(displayCount) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>:"
-                let htmlStr = generateDashboardHTML(jobs: jobs.isEmpty ? [] : Array(jobs.prefix(20)),
+                let htmlStr = generateDashboardHTML(jobs: jobs.isEmpty ? [] : Array(jobs.prefix(30)),
                                                      greeting: greeting,
                                                      locationTitle: settings.locationTitle,
                                                      searchUrl: settings.activeUrl)
