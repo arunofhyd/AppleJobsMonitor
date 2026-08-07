@@ -1212,40 +1212,88 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
     }
 
+    private var activeModalWindow: NSWindow?
+
+    @objc func closeInfoModal(_ sender: NSButton) {
+        NSApp.stopModal()
+        activeModalWindow?.close()
+        activeModalWindow = nil
+    }
+
+    func showCustomInfoModal(title: String, contentText: String, isMonospaced: Bool = false) {
+        let winWidth: CGFloat = 500
+        let winHeight: CGFloat = 340
+        
+        let modalWin = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: winWidth, height: winHeight),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        modalWin.title = title
+        modalWin.titleVisibility = .hidden
+        modalWin.titlebarAppearsTransparent = true
+        modalWin.isMovableByWindowBackground = true
+        modalWin.backgroundColor = NSColor.windowBackgroundColor
+        modalWin.center()
+        
+        let contentView = modalWin.contentView!
+        
+        // 1. Top Centered App Logo
+        let logoSize: CGFloat = 64
+        let logoX = (winWidth - logoSize) / 2.0
+        let logoView = NSImageView(frame: NSRect(x: logoX, y: winHeight - 78, width: logoSize, height: logoSize))
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        if let img = NSImage(contentsOfFile: iconPath) {
+            logoView.image = img
+        } else {
+            logoView.image = NSImage(systemSymbolName: "briefcase.fill", accessibilityDescription: nil)
+        }
+        contentView.addSubview(logoView)
+        
+        // 2. Centered Modal Title
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = NSFont.systemFont(ofSize: 15, weight: .bold)
+        titleLabel.alignment = .center
+        titleLabel.frame = NSRect(x: 20, y: winHeight - 108, width: winWidth - 40, height: 22)
+        contentView.addSubview(titleLabel)
+        
+        // 3. Scrollable Content Area Box
+        let scrollView = NSScrollView(frame: NSRect(x: 24, y: 62, width: winWidth - 48, height: winHeight - 180))
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .bezelBorder
+        
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: winWidth - 48, height: winHeight - 180))
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.string = contentText
+        textView.font = isMonospaced ? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular) : NSFont.systemFont(ofSize: 12, weight: .regular)
+        textView.textColor = .labelColor
+        
+        scrollView.documentView = textView
+        contentView.addSubview(scrollView)
+        
+        // 4. Centered OK Button (exact size & rounded shape matching Cancel/Save Settings)
+        let okBtnWidth: CGFloat = 100
+        let okBtnX = (winWidth - okBtnWidth) / 2.0
+        let okBtn = NSButton(title: "OK", target: self, action: #selector(closeInfoModal))
+        okBtn.frame = NSRect(x: okBtnX, y: 14, width: okBtnWidth, height: 32)
+        okBtn.bezelStyle = .rounded
+        okBtn.keyEquivalent = "\r"
+        contentView.addSubview(okBtn)
+        
+        activeModalWindow = modalWin
+        NSApp.runModal(for: modalWin)
+    }
+
     @objc func showCustomUrlPreview() {
         let currentUrl = customUrlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let alert = NSAlert()
-        alert.messageText = "Full Custom Search URL"
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        
-        if currentUrl.isEmpty {
-            alert.informativeText = "No URL pasted yet. Select 'Custom URL' and paste a search link from jobs.apple.com."
-        } else {
-            alert.informativeText = ""
-            let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 460, height: 110))
-            scrollView.hasVerticalScroller = true
-            scrollView.borderType = .bezelBorder
-            
-            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 460, height: 110))
-            textView.isEditable = false
-            textView.isSelectable = true
-            textView.string = currentUrl
-            textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-            textView.textColor = .labelColor
-            
-            scrollView.documentView = textView
-            alert.accessoryView = scrollView
-        }
-        
-        alert.icon = NSImage(size: NSSize(width: 1, height: 1))
-        alert.runModal()
+        let text = currentUrl.isEmpty ? "No URL pasted yet.\nSelect 'Custom URL' and paste a search link from jobs.apple.com." : currentUrl
+        showCustomInfoModal(title: "Full Custom Search URL", contentText: text, isMonospaced: !currentUrl.isEmpty)
     }
 
     @objc func showCustomUrlInstructions() {
-        let alert = NSAlert()
-        alert.messageText = "Custom Search URLs"
-        alert.informativeText = """
+        let text = """
         You can monitor specific job titles, teams, or custom search criteria by using a custom URL from Apple Jobs.
 
         Instructions:
@@ -1257,21 +1305,12 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         Note:
         Apple's search engine automatically scans your keywords across job titles, descriptions, responsibilities, and qualifications.
         """
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
-        if let img = NSImage(contentsOfFile: iconPath) {
-            alert.icon = img
-        }
-        alert.runModal()
+        showCustomInfoModal(title: "Custom Search URLs", contentText: text, isMonospaced: false)
     }
     
     @objc func showNotificationStyleInfo() {
-        let alert = NSAlert()
-        alert.messageText = "Notification Styles"
-        alert.informativeText = """
-        Jobs Monitor provides two notification delivery modes when new job openings are detected.
+        let text = """
+        Jobs Monitor provides two notification delivery modes when new job openings are detected:
 
         • Mid-Screen Popup Window (Default)
         Displays an interactive alert window in the center of your screen. Mid-screen popup windows bypass macOS Do Not Disturb settings to ensure urgent postings are noticed immediately.
@@ -1279,14 +1318,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         • System Notification Banner
         Delivers standard macOS system notifications in the upper-right corner of your screen. System notification banners adhere to your macOS Do Not Disturb schedule.
         """
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
-        if let img = NSImage(contentsOfFile: iconPath) {
-            alert.icon = img
-        }
-        alert.runModal()
+        showCustomInfoModal(title: "Notification Delivery Styles", contentText: text, isMonospaced: false)
     }
 
     private var volumePreviewTimer: Timer?
