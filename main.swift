@@ -1342,6 +1342,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         playNotificationSound(soundName, volume: vol)
         
         if style == 0 {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
             let content = UNMutableNotificationContent()
             content.title = " Jobs Monitor (Banner Preview)"
             content.body = "This is a sample System Notification Banner! Banners appear in the upper-right corner of your screen."
@@ -1353,8 +1354,39 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
                 }
             }
         } else {
-            let text = "This is a sample Mid-Screen Popup Window alert!\n\nMid-screen popup windows appear in the center of your screen to ensure urgent job postings are noticed immediately."
-            showCustomInfoModal(title: " Jobs Monitor (Popup Preview)", contentText: text, isMonospaced: false)
+            let alert = NSAlert()
+            alert.messageText = " 3 New Apple Jobs!"
+            alert.informativeText = "3 brand new roles posted for your target location!\n\n(This is a live preview of the Mid-Screen Popup Window alert)"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "View Dashboard")
+            alert.addButton(withTitle: "Dismiss")
+            
+            let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+            if let img = NSImage(contentsOfFile: iconPath) {
+                alert.icon = img
+            }
+            
+            // Auto-dismiss preview if configured
+            var dismissSecs = 300
+            switch dismissPopUp.indexOfSelectedItem {
+            case 0: dismissSecs = 10
+            case 1: dismissSecs = 30
+            case 2: dismissSecs = 60
+            case 3: dismissSecs = 180
+            case 5: dismissSecs = 600
+            case 6: dismissSecs = 0
+            default: dismissSecs = 300
+            }
+            
+            if dismissSecs > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(dismissSecs)) {
+                    if let window = alert.window.sheetParent ?? NSApp.windows.first(where: { $0.title == " 3 New Apple Jobs!" }) {
+                        window.close()
+                    }
+                }
+            }
+            
+            alert.runModal()
         }
     }
 
