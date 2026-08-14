@@ -518,6 +518,7 @@ struct StateData: Codable {
     var last_checked_str: String?
     var last_daily_popup: String?
     var last_popup_time: String?
+    var last_check_timestamp: Double?
 }
 
 func loadStateData() -> StateData {
@@ -1919,19 +1920,41 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
     
     @objc func macOSDidWake(_ notification: Notification) {
-        logMessage("macOS woke from sleep — refreshing timers and checking scheduled daily digest")
-        scheduleTimer()
+        logMessage("macOS woke from sleep — evaluating timer status and scheduled daily digest")
+        evaluateAndScheduleTimer()
         scheduleDailyTimer()
     }
     
     func scheduleTimer() {
+        evaluateAndScheduleTimer()
+    }
+    
+    func evaluateAndScheduleTimer() {
         timer?.invalidate()
         let settings = loadSettings()
         let intervalSeconds = Double(settings.checkIntervalMinutes * 60)
         
-        timer = Timer.scheduledTimer(withTimeInterval: intervalSeconds, repeats: true) { [weak self] _ in
-            self?.performCheck(isManual: false)
-            self?.scheduleDailyTimer()
+        let state = loadStateData()
+        let now = Date()
+        let lastCheckTime = state.last_check_timestamp ?? 0
+        let elapsed = now.timeIntervalSince1970 - lastCheckTime
+        
+        if lastCheckTime > 0 && elapsed < intervalSeconds {
+            let remaining = max(5.0, intervalSeconds - elapsed)
+            logMessage("Next job check scheduled in \(Int(remaining / 60)) min (\(Int(remaining))s)")
+            timer = Timer.scheduledTimer(withTimeInterval: remaining, repeats: false) { [weak self] _ in
+                self?.performCheck(isManual: false)
+                self?.scheduleTimer()
+                self?.scheduleDailyTimer()
+            }
+        } else {
+            logMessage("Job check due/overdue (elapsed: \(Int(elapsed / 60)) min) — running job check")
+            performCheck(isManual: false)
+            
+            timer = Timer.scheduledTimer(withTimeInterval: intervalSeconds, repeats: true) { [weak self] _ in
+                self?.performCheck(isManual: false)
+                self?.scheduleDailyTimer()
+            }
         }
     }
     
@@ -2122,11 +2145,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             
             let newJobs = isFirstRun ? [] : jobs.filter { !seenSet.contains($0.id) }
             
+            let now = Date()
             let formatter = DateFormatter()
             formatter.dateFormat = "d MMM, HH:mm"
-            let timeStr = formatter.string(from: Date())
+            let timeStr = formatter.string(from: now)
             state.last_checked_str = timeStr
             state.last_job_count = jobs.count
+            state.last_check_timestamp = now.timeIntervalSince1970
             
             let currentUnread = (state.unread_count ?? 0) + newJobs.count
             state.unread_count = currentUnread
