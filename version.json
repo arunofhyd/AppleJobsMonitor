@@ -1,7 +1,15 @@
 {
-  "version": "2.1.8",
+  "version": "2.1.9",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.1.9",
+      "date": "2026-08-14",
+      "changes": [
+        "Smart Sleep/Wake Timer Evaluation: Fixed background timer reset bug where macOS sleep/wake cycles repeatedly delayed periodic checks.",
+        "Overdue Job Check Recovery: Automatically measures elapsed time on wake and executes overdue job checks immediately."
+      ]
+    },
     {
       "version": "2.1.8",
       "date": "2026-08-07",
