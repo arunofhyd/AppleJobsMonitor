@@ -3,9 +3,10 @@ import Foundation
 import ServiceManagement
 import SwiftUI
 import UserNotifications
+import WebKit
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.1.9"
+let APP_VERSION = "2.2.0"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -280,12 +281,14 @@ struct AppSettings: Codable {
     var dailyCheckMinute: Int // 0..59
     var activeDays: [Bool] // 7 booleans for [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
     var launchAtLogin: Bool
+    var enableInternalMode: Bool
+    var internalOnly: Bool
     
     enum CodingKeys: String, CodingKey {
-        case locationMode, countryIndex, cityIndex, customUrl, checkIntervalMinutes, popupDismissSeconds, notificationSound, notificationVolume, notificationStyle, enableDailyCheck, dailyCheckHour, dailyCheckMinute, activeDays, launchAtLogin
+        case locationMode, countryIndex, cityIndex, customUrl, checkIntervalMinutes, popupDismissSeconds, notificationSound, notificationVolume, notificationStyle, enableDailyCheck, dailyCheckHour, dailyCheckMinute, activeDays, launchAtLogin, enableInternalMode, internalOnly
     }
     
-    init(locationMode: Int, countryIndex: Int, cityIndex: Int, customUrl: String, checkIntervalMinutes: Int, popupDismissSeconds: Int, notificationSound: String, notificationVolume: Float = 1.0, notificationStyle: Int = 1, enableDailyCheck: Bool, dailyCheckHour: Int, dailyCheckMinute: Int, activeDays: [Bool], launchAtLogin: Bool) {
+    init(locationMode: Int, countryIndex: Int, cityIndex: Int, customUrl: String, checkIntervalMinutes: Int, popupDismissSeconds: Int, notificationSound: String, notificationVolume: Float = 1.0, notificationStyle: Int = 1, enableDailyCheck: Bool, dailyCheckHour: Int, dailyCheckMinute: Int, activeDays: [Bool], launchAtLogin: Bool, enableInternalMode: Bool = false, internalOnly: Bool = false) {
         self.locationMode = locationMode
         self.countryIndex = countryIndex
         self.cityIndex = cityIndex
@@ -300,6 +303,8 @@ struct AppSettings: Codable {
         self.dailyCheckMinute = dailyCheckMinute
         self.activeDays = activeDays
         self.launchAtLogin = launchAtLogin
+        self.enableInternalMode = enableInternalMode
+        self.internalOnly = internalOnly
     }
     
     init(from decoder: Decoder) throws {
@@ -318,6 +323,8 @@ struct AppSettings: Codable {
         dailyCheckMinute = try container.decodeIfPresent(Int.self, forKey: .dailyCheckMinute) ?? 0
         activeDays = try container.decodeIfPresent([Bool].self, forKey: .activeDays) ?? [false, true, true, true, true, true, false]
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? true
+        enableInternalMode = try container.decodeIfPresent(Bool.self, forKey: .enableInternalMode) ?? false
+        internalOnly = try container.decodeIfPresent(Bool.self, forKey: .internalOnly) ?? false
     }
     
     static var defaultConfig: AppSettings {
@@ -335,7 +342,9 @@ struct AppSettings: Codable {
             dailyCheckHour: 10,
             dailyCheckMinute: 0,
             activeDays: [false, true, true, true, true, true, false],
-            launchAtLogin: true
+            launchAtLogin: true,
+            enableInternalMode: false,
+            internalOnly: false
         )
     }
     
@@ -350,6 +359,10 @@ struct AppSettings: Codable {
             let idx = (countryIndex >= 0 && countryIndex < countryPresets.count) ? countryIndex : 0
             return "https://jobs.apple.com/en-us/search?location=\(countryPresets[idx].code)&sort=newest"
         }
+    }
+    
+    var activeCareersUrl: String {
+        return activeUrl.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
     }
     
     var locationTitle: String {
@@ -509,6 +522,7 @@ struct JobItem: Codable {
     let url: String
     var countries: [String]? = []
     var cities: [String]? = []
+    var isInternal: Bool? = false
 }
 
 struct StateData: Codable {
@@ -519,6 +533,8 @@ struct StateData: Codable {
     var last_daily_popup: String?
     var last_popup_time: String?
     var last_check_timestamp: Double?
+    var isAppleConnectAuthenticated: Bool?
+    var ssoSessionExpired: Bool?
 }
 
 func loadStateData() -> StateData {
@@ -542,20 +558,60 @@ func getUserFirstName() -> String {
 }
 
 // ── HTML Dashboard Generator ───────────────────────────────────────────────────
-func generateDashboardHTML(jobs: [JobItem], greeting: String, locationTitle: String, searchUrl: String) -> String {
+func generateDashboardHTML(
+    jobs: [JobItem],
+    internalIdSet: Set<String>,
+    publicIdSet: Set<String>,
+    internalTotalCount: Int,
+    publicTotalCount: Int,
+    enableInternalMode: Bool,
+    internalOnly: Bool,
+    greeting: String,
+    locationTitle: String,
+    searchUrl: String
+) -> String {
+    let totalCount = jobs.count
+    
     var rows = ""
     for j in jobs {
-        let careersUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
+        let inInternal = internalIdSet.contains(j.id) || (j.isInternal == true)
+        let inPublic = publicIdSet.contains(j.id)
+        
+        let targetUrl: String
+        let badgeHtml: String
+        let btnText: String
+        let btnClass: String
+        
+        if inInternal && !inPublic {
+            // Scenario 1: Exclusive to AppleConnect
+            badgeHtml = "<span class=\"badge-tag badge-internal\"> Internal Only</span>"
+            targetUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
+            btnText = "Internal ↗"
+            btnClass = "careers-btn internal-btn"
+        } else if inInternal && inPublic {
+            // Scenario 2: Listed on Both
+            badgeHtml = "<span class=\"badge-tag badge-internal\"> Internal</span><span class=\"badge-tag badge-public\">🌐 Public</span>"
+            targetUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
+            btnText = "Internal ↗"
+            btnClass = "careers-btn internal-btn"
+        } else {
+            // Scenario 3: Public Only
+            badgeHtml = "<span class=\"badge-tag badge-public\">🌐 Public Only</span>"
+            targetUrl = j.url.replacingOccurrences(of: "careers.apple.com", with: "jobs.apple.com")
+            btnText = "Public ↗"
+            btnClass = "careers-btn public-btn"
+        }
+        
         rows += """
-        <tr>
+        <tr data-internal="\(inInternal)" data-public="\(inPublic)" data-both="true">
           <td class="cell">
-            <a href="\(j.url)" class="job-link">\(j.title)</a>
+            \(badgeHtml)<a href="\(targetUrl)" class="job-link" target="_blank">\(j.title)</a>
             <br><span class="text-muted">\(j.team)</span>
           </td>
           <td class="cell text-muted">\(j.posted.isEmpty ? "—" : j.posted)</td>
           <td class="cell">\(j.location)</td>
           <td class="cell" style="text-align:right; padding-right: 8px;">
-            <a href="\(careersUrl)" class="careers-btn" target="_blank">Careers ↗</a>
+            <a href="\(targetUrl)" class="\(btnClass)" target="_blank">\(btnText)</a>
           </td>
         </tr>
         """
@@ -563,9 +619,83 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, locationTitle: Str
     
     let nowStr = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .short)
     
+    var filterBarHtml = ""
+    if !enableInternalMode {
+        filterBarHtml = """
+        <div class="filter-bar">
+          <div class="search-box-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="job-search" class="search-input" placeholder="Search roles, teams, locations..." oninput="filterDashboard()" autocomplete="off" spellcheck="false">
+            <button class="clear-search-btn" id="clear-search" onclick="clearSearch()" style="display:none;">✕</button>
+          </div>
+          <div class="filter-status" id="filter-status">Showing all \(totalCount) public roles</div>
+        </div>
+        """
+    } else if internalOnly {
+        filterBarHtml = """
+        <div class="filter-bar">
+          <div class="search-box-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="job-search" class="search-input" placeholder="Search \(totalCount) internal roles..." oninput="filterDashboard()" autocomplete="off" spellcheck="false">
+            <button class="clear-search-btn" id="clear-search" onclick="clearSearch()" style="display:none;">✕</button>
+          </div>
+          <div class="filter-status" id="filter-status">Showing all \(totalCount)  internal roles</div>
+        </div>
+        """
+    } else {
+        filterBarHtml = """
+        <div class="filter-bar">
+          <div class="filter-group">
+            <button class="filter-pill active" onclick="setFilter('all', this)">Both / All <span class="pill-count">\(totalCount)</span></button>
+            <button class="filter-pill" onclick="setFilter('internal', this)"> Internal <span class="pill-count">\(internalTotalCount)</span></button>
+            <button class="filter-pill" onclick="setFilter('public', this)">🌐 Public <span class="pill-count">\(publicTotalCount)</span></button>
+          </div>
+          <div class="search-box-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="job-search" class="search-input" placeholder="Search roles, teams, cities..." oninput="filterDashboard()" autocomplete="off" spellcheck="false">
+            <button class="clear-search-btn" id="clear-search" onclick="clearSearch()" style="display:none;">✕</button>
+          </div>
+        </div>
+        <div class="filter-status-row">
+          <span class="filter-status" id="filter-status">Showing all \(totalCount) roles</span>
+        </div>
+        """
+    }
+    
+    var footerBannerHtml = ""
+    if !enableInternalMode {
+        footerBannerHtml = """
+        <div style="padding: 20px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
+          <strong style="color: var(--text-main);">Job Links:</strong> Clicking any <strong>job title</strong> or button opens the role directly on <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
+        </div>
+        """
+    } else if internalOnly {
+        footerBannerHtml = """
+        <div style="padding: 20px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
+          <strong style="color: var(--text-main);">Job Links & Portals:</strong> <span class="badge-tag badge-internal" style="margin: 0 4px;"> Internal</span> roles link directly to <a href="https://careers.apple.com" target="_blank" style="color: #af52de; font-weight: 600; text-decoration: none;">careers.apple.com ↗</a> via AppleConnect SSO.
+        </div>
+        """
+    } else {
+        footerBannerHtml = """
+        <div style="padding: 22px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
+          <div style="font-weight: 600; color: var(--text-main); margin-bottom: 8px;">Job Links & Portals:</div>
+          <div style="margin-bottom: 6px;">
+            • <span class="badge-tag badge-internal" style="margin: 0 6px 0 2px;"> Internal Only</span> Roles exclusive to Apple employees via <a href="https://careers.apple.com" target="_blank" style="color: #af52de; font-weight: 600; text-decoration: none;">careers.apple.com ↗</a> (AppleConnect SSO).
+          </div>
+          <div style="margin-bottom: 6px;">
+            • <span class="badge-tag badge-internal" style="margin: 0 4px 0 2px;"> Internal</span> <span class="badge-tag badge-public" style="margin: 0 6px 0 0;">🌐 Public</span> Roles listed on both internal and public portals.
+          </div>
+          <div>
+            • <span class="badge-tag badge-public" style="margin: 0 6px 0 2px;">🌐 Public Only</span> Roles open on the public jobs site at <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
+          </div>
+        </div>
+        """
+    }
+    
     return """
     <!DOCTYPE html>
     <html><head><meta charset="utf-8">
+    <title> Jobs Monitor · \(locationTitle)</title>
     <style>
       :root {
         --bg-page: #f5f5f7;
@@ -599,17 +729,148 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, locationTitle: Str
       .header-title { color:var(--header-text); font-size:22px; font-weight:600; letter-spacing:-0.01em; }
       .content { padding:28px 32px; }
       .greeting { font-size:16px; margin:0 0 20px; }
+      
+      .filter-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 16px 0 14px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .filter-group {
+        display: inline-flex;
+        background: var(--bg-page);
+        padding: 4px;
+        border-radius: 30px;
+        border: 1px solid var(--border);
+        gap: 4px;
+      }
+      .filter-pill {
+        background: transparent;
+        border: 1px solid transparent;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-sec);
+        cursor: pointer;
+        transition: all 0.18s ease-in-out;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        outline: none;
+        font-family: inherit;
+      }
+      .filter-pill:hover {
+        color: var(--text-main);
+      }
+      .filter-pill.active {
+        background: var(--bg-card);
+        color: var(--text-main);
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid var(--border);
+      }
+      .pill-count {
+        display: inline-block;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-size: 11px;
+        background: rgba(128,128,128,0.14);
+        color: inherit;
+        font-weight: 600;
+      }
+      .filter-pill.active .pill-count {
+        background: rgba(128,128,128,0.22);
+      }
+      
+      .search-box-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        min-width: 260px;
+        background: var(--bg-page);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 0 12px;
+        transition: all 0.2s ease;
+      }
+      .search-box-wrapper:focus-within {
+        border-color: var(--link);
+        box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+        background: var(--bg-card);
+      }
+      .search-icon {
+        font-size: 13px;
+        opacity: 0.6;
+        margin-right: 6px;
+        user-select: none;
+      }
+      .search-input {
+        border: none;
+        background: transparent;
+        outline: none;
+        font-family: inherit;
+        font-size: 13px;
+        color: var(--text-main);
+        width: 100%;
+        padding: 7px 0;
+      }
+      .search-input::placeholder {
+        color: var(--text-sec);
+      }
+      .clear-search-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-sec);
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0 4px;
+        outline: none;
+      }
+      .clear-search-btn:hover {
+        color: var(--text-main);
+      }
+      
+      .filter-status-row {
+        margin-bottom: 18px;
+      }
+      .filter-status {
+        font-size: 13px;
+        color: var(--text-sec);
+      }
+      
       table { width:100%; border-collapse:collapse; }
       th { padding:12px 8px; text-align:left; font-size:12px; color:var(--text-sec); text-transform:uppercase; border-bottom:1px solid var(--border); font-weight:600; letter-spacing:0.02em; }
       .cell { padding:16px 8px; border-bottom:1px solid var(--border); font-size:14px; }
       .job-link { color:var(--link); font-weight:600; text-decoration:none; font-size:15px; }
       .job-link:hover { text-decoration:underline; }
-      .careers-btn {
+      .badge-tag {
         display: inline-block;
         padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-right: 6px;
+        vertical-align: middle;
+        position: relative;
+        top: -1px;
+      }
+      .badge-internal {
+        background: rgba(175, 82, 222, 0.15);
+        color: #af52de;
+        border: 1px solid rgba(175, 82, 222, 0.35);
+      }
+      .badge-public {
+        background: rgba(0, 113, 227, 0.1);
+        color: #0071e3;
+        border: 1px solid rgba(0, 113, 227, 0.25);
+      }
+      .careers-btn {
+        display: inline-block;
+        padding: 2px 10px;
         background: transparent;
-        color: var(--link);
-        border: 1px solid var(--link);
         border-radius: 12px;
         font-size: 11px;
         font-weight: 500;
@@ -617,9 +878,22 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, locationTitle: Str
         transition: all 0.2s;
         line-height: 1.2;
       }
-      .careers-btn:hover {
-        background: var(--link);
-        color: var(--btn-text);
+      .public-btn {
+        color: var(--link) !important;
+        border: 1px solid var(--link) !important;
+      }
+      .public-btn:hover {
+        background: var(--link) !important;
+        color: #ffffff !important;
+        text-decoration: none;
+      }
+      .internal-btn {
+        color: #af52de !important;
+        border: 1px solid #af52de !important;
+      }
+      .internal-btn:hover {
+        background: #af52de !important;
+        color: #ffffff !important;
         text-decoration: none;
       }
       .text-muted { color:var(--text-sec); font-size:13px; }
@@ -635,22 +909,100 @@ func generateDashboardHTML(jobs: [JobItem], greeting: String, locationTitle: Str
         </div>
         <div class="content">
           <p class="greeting">\(greeting)</p>
+          
+          \(filterBarHtml)
+          
           <table>
             <thead><tr><th style="width: 65%;">Role</th><th style="width: 11%;">Posted</th><th style="width: 12%;">Location</th><th style="text-align:right; width: 12%; padding-right: 18px;">PORTAL</th></tr></thead>
-            <tbody>\(rows)</tbody>
+            <tbody>
+              \(rows)
+              <tr id="no-match-row" style="display:none;">
+                <td colspan="4" style="text-align:center; padding: 40px 16px; color: var(--text-sec); font-size: 14px;">
+                  No roles match your search or filter criteria.
+                </td>
+              </tr>
+            </tbody>
           </table>
           <div class="btn-wrapper">
             <a href="\(searchUrl)" class="btn">View All Apple Jobs →</a>
           </div>
         </div>
-        <div style="padding: 20px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
-          <strong style="color: var(--text-main);">Job Links:</strong> Clicking on the <strong style="color: var(--link);">job title</strong> takes you to the public jobs page, and clicking on the <span class="careers-btn" style="margin: 0 4px; pointer-events: none; padding: 1px 6px; font-size: 10px; display: inline-block; vertical-align: middle; position: relative; top: -1px;">Careers ↗</span> button takes you to the internal company posting if available.
-        </div>
+        \(footerBannerHtml)
         <div class="footer">
           Jobs Monitor v\(APP_VERSION) · Built by Arun Thomas · Contact: \(CONTACT_EMAIL)<br>
           \(nowStr)
         </div>
       </div>
+      
+      <script>
+        var activeFilter = 'all';
+        
+        function setFilter(type, btn) {
+          document.querySelectorAll('.filter-pill').forEach(function(el) { el.classList.remove('active'); });
+          if (btn) btn.classList.add('active');
+          activeFilter = type;
+          filterDashboard();
+        }
+        
+        function clearSearch() {
+          var input = document.getElementById('job-search');
+          if (input) {
+            input.value = '';
+            var clearBtn = document.getElementById('clear-search');
+            if (clearBtn) clearBtn.style.display = 'none';
+            filterDashboard();
+            input.focus();
+          }
+        }
+        
+        function filterDashboard() {
+          var searchInput = document.getElementById('job-search');
+          var query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+          var clearBtn = document.getElementById('clear-search');
+          if (clearBtn) {
+            clearBtn.style.display = query.length > 0 ? 'inline-block' : 'none';
+          }
+          
+          var rows = document.querySelectorAll('tbody tr[data-both]');
+          var visibleCount = 0;
+          
+          rows.forEach(function(row) {
+            var matchType = false;
+            if (activeFilter === 'all') {
+              matchType = true;
+            } else if (activeFilter === 'internal') {
+              matchType = (row.getAttribute('data-internal') === 'true');
+            } else if (activeFilter === 'public') {
+              matchType = (row.getAttribute('data-public') === 'true');
+            }
+            
+            var text = row.textContent.toLowerCase();
+            var matchQuery = (query === '' || text.indexOf(query) !== -1);
+            
+            if (matchType && matchQuery) {
+              row.style.display = '';
+              visibleCount++;
+            } else {
+              row.style.display = 'none';
+            }
+          });
+          
+          var noMatch = document.getElementById('no-match-row');
+          if (noMatch) {
+            noMatch.style.display = (visibleCount === 0) ? 'table-row' : 'none';
+          }
+          
+          var status = document.getElementById('filter-status');
+          if (status) {
+            var label = (activeFilter === 'all') ? 'roles' : ((activeFilter === 'internal') ? ' internal roles' : '🌐 public roles');
+            if (query.length > 0) {
+              status.textContent = 'Found ' + visibleCount + ' ' + label + ' matching "' + query + '"';
+            } else {
+              status.textContent = 'Showing all ' + visibleCount + ' ' + label;
+            }
+          }
+        }
+      </script>
     </body></html>
     """
 }
@@ -693,7 +1045,7 @@ func parsePostedDate(_ str: String) -> Date {
 }
 
 // ── HTML Parser ────────────────────────────────────────────────────────────────
-func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSettings) -> [JobItem] {
+func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSettings, isInternal: Bool = false) -> [JobItem] {
     var rawResults: [JobItem] = []
     
     let marker = "window.__staticRouterHydrationData = JSON.parse(\""
@@ -713,7 +1065,7 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSe
                         let roles = (dict["searchResults"] as? [[String: Any]]) ?? (dict["roles"] as? [[String: Any]])
                         if let rolesList = roles {
                             for r in rolesList {
-                                if let item = normalizeJob(r, defaultUrl: defaultSearchUrl) {
+                                if let item = normalizeJob(r, defaultUrl: defaultSearchUrl, isInternal: isInternal) {
                                     rawResults.append(item)
                                 }
                             }
@@ -768,7 +1120,7 @@ func parseJobsFromHTML(_ html: String, defaultSearchUrl: String, settings: AppSe
     }
 }
 
-func normalizeJob(_ raw: [String: Any], defaultUrl: String) -> JobItem? {
+func normalizeJob(_ raw: [String: Any], defaultUrl: String, isInternal: Bool = false) -> JobItem? {
     let pid = (raw["positionId"] as? String) ?? (raw["id"] as? String) ?? ""
     if pid.isEmpty { return nil }
     
@@ -806,9 +1158,9 @@ func normalizeJob(_ raw: [String: Any], defaultUrl: String) -> JobItem? {
     if locStr.isEmpty { locStr = "Apple" }
     
     let posted = (raw["postingDate"] as? String) ?? (raw["datePosted"] as? String) ?? ""
-    let url = "https://jobs.apple.com/en-us/details/\(pid)"
+    let url = isInternal ? "https://careers.apple.com/en-us/details/\(pid)" : "https://jobs.apple.com/en-us/details/\(pid)"
     
-    return JobItem(id: pid, title: title, team: teamStr, location: locStr, posted: posted, url: url, countries: extractedCountries, cities: extractedCities)
+    return JobItem(id: pid, title: title, team: teamStr, location: locStr, posted: posted, url: url, countries: extractedCountries, cities: extractedCities, isInternal: isInternal)
 }
 
 // ── ClipLocal-Style Native About Window ─────────────────────────────────────────
@@ -888,6 +1240,127 @@ class AboutWindowController: NSWindowController {
     }
 }
 
+// ── AppleConnect SSO WebKit Authentication Window ──────────────────────────────
+class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate {
+    var webView: WKWebView!
+    var statusLabel: NSTextField!
+    var progressIndicator: NSProgressIndicator!
+    var onAuthCompletion: ((Bool) -> Void)?
+
+    convenience init() {
+        let win = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 750),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        win.title = "AppleConnect Sign In · Jobs Monitor"
+        win.center()
+        self.init(window: win)
+        setupUI()
+    }
+
+    func setupUI() {
+        guard let win = window else { return }
+        let contentView = NSView(frame: win.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 720, height: 750))
+        contentView.autoresizingMask = [.width, .height]
+        
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = WKWebsiteDataStore.default()
+        
+        webView = WKWebView(frame: NSRect(x: 0, y: 44, width: contentView.bounds.width, height: contentView.bounds.height - 44), configuration: config)
+        webView.autoresizingMask = [.width, .height]
+        webView.navigationDelegate = self
+        contentView.addSubview(webView)
+        
+        // Bottom Status Bar
+        let bottomBar = NSView(frame: NSRect(x: 0, y: 0, width: contentView.bounds.width, height: 44))
+        bottomBar.autoresizingMask = [.width, .maxYMargin]
+        bottomBar.wantsLayer = true
+        bottomBar.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        
+        statusLabel = NSTextField(labelWithString: "Sign in with your AppleConnect credentials to enable Internal Mode...")
+        statusLabel.frame = NSRect(x: 16, y: 12, width: 500, height: 20)
+        statusLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        statusLabel.textColor = .secondaryLabelColor
+        bottomBar.addSubview(statusLabel)
+        
+        progressIndicator = NSProgressIndicator(frame: NSRect(x: contentView.bounds.width - 36, y: 14, width: 16, height: 16))
+        progressIndicator.style = .spinning
+        progressIndicator.controlSize = .small
+        progressIndicator.autoresizingMask = [.minXMargin]
+        progressIndicator.isDisplayedWhenStopped = false
+        bottomBar.addSubview(progressIndicator)
+        
+        contentView.addSubview(bottomBar)
+        win.contentView = contentView
+    }
+
+    func startAuthentication(targetUrl: String? = nil) {
+        showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        let urlStr = targetUrl ?? "https://careers.apple.com/en-us/search"
+        guard let url = URL(string: urlStr) else { return }
+        let req = URLRequest(url: url)
+        progressIndicator.startAnimation(nil)
+        statusLabel.stringValue = "Loading AppleConnect portal..."
+        webView.load(req)
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        progressIndicator.startAnimation(nil)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        progressIndicator.stopAnimation(nil)
+        let currentUrl = webView.url?.absoluteString ?? ""
+        logMessage("AppleConnect webView navigated to: \(currentUrl)")
+        
+        // Check if user reached careers.apple.com authenticated search/home without being on idmsa.apple.com
+        if currentUrl.contains("careers.apple.com") && !currentUrl.contains("idmsa.apple.com") && !currentUrl.contains("appleconnect") {
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
+                let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
+                let hasAuthCookies = appleCookies.contains(where: {
+                    let name = $0.name.lowercased()
+                    return name.contains("myacinfo") || name.contains("dqsess") || name.contains("itctx") || name.contains("session") || name.contains("auth")
+                }) || !appleCookies.isEmpty
+                
+                if hasAuthCookies {
+                    DispatchQueue.main.async {
+                        self?.statusLabel.stringValue = "✔ Successfully Authenticated with AppleConnect!"
+                        self?.statusLabel.textColor = .systemGreen
+                        var state = loadStateData()
+                        state.isAppleConnectAuthenticated = true
+                        saveStateData(state)
+                        self?.onAuthCompletion?(true)
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            self?.window?.close()
+                        }
+                    }
+                }
+            }
+        } else {
+            statusLabel.stringValue = "Please complete AppleConnect verification in the window above..."
+            statusLabel.textColor = .secondaryLabelColor
+        }
+    }
+
+    static func clearSession(completion: @escaping () -> Void) {
+        let store = WKWebsiteDataStore.default()
+        let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+        store.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast) {
+            var state = loadStateData()
+            state.isAppleConnectAuthenticated = false
+            saveStateData(state)
+            DispatchQueue.main.async {
+                completion()
+            }
+        }
+    }
+}
+
 // ── Dynamic Appearance Card & Header Views for Preferences ──────────────────────
 class SettingsHeaderView: NSView {
     override init(frame frameRect: NSRect) {
@@ -921,7 +1394,7 @@ class SettingsCardView: NSView {
 }
 
 // ── Native Preferences Window ──────────────────────────────────────────────────
-class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
+class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindowDelegate {
     var radioCountry: NSButton!
     var countryPopUp: NSPopUpButton!
     
@@ -947,13 +1420,20 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     var timePopUp: NSPopUpButton!
     var dayButtons: [NSButton] = []
     
+    var enableInternalModeCheckbox: NSButton!
+    var internalOnlyCheckbox: NSButton!
+    var internalAuthStatusLabel: NSTextField!
+    var signInAppleConnectBtn: NSButton!
+    var disconnectAppleConnectBtn: NSButton!
+    var authWindowController: AppleConnectAuthWindowController?
+    
     var launchAtLoginCheckbox: NSButton!
     
     var onSave: (() -> Void)?
     
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 660, height: 825),
+            contentRect: NSRect(x: 0, y: 0, width: 660, height: 960),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -965,8 +1445,14 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         window.backgroundColor = NSColor.windowBackgroundColor
         window.center()
         self.init(window: window)
+        window.delegate = self
         
         setupUI()
+        loadCurrentValues()
+    }
+    
+    func windowWillClose(_ notification: Notification) {
+        // Discard any uncommitted changes when window is closed without saving
         loadCurrentValues()
     }
     
@@ -974,7 +1460,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         guard let contentView = window?.contentView else { return }
         
         // ── Top Header Banner (Centralized Logo Only) ─────────────────
-        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 735, width: 660, height: 90))
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: 870, width: 660, height: 90))
         
         let iconView = NSImageView(frame: NSRect(x: 298, y: 13, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -991,8 +1477,8 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         
         contentView.addSubview(headerView)
         
-        // ── Card 1: Target Location (y: 560, height: 165) ────────────
-        let card1 = createCardView(frame: NSRect(x: 24, y: 560, width: 612, height: 165))
+        // ── Card 1: Target Location (y: 695, height: 165) ────────────
+        let card1 = createCardView(frame: NSRect(x: 24, y: 695, width: 612, height: 165))
         
         let card1Title = createSectionHeader(title: "Target Location", iconName: "mappin.and.ellipse", frame: NSRect(x: 16, y: 132, width: 580, height: 22))
         card1.addSubview(card1Title)
@@ -1046,8 +1532,8 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         
         contentView.addSubview(card1)
         
-        // ── Card 2: Refresh Frequency (y: 460, height: 85) ─────────
-        let card2 = createCardView(frame: NSRect(x: 24, y: 460, width: 612, height: 85))
+        // ── Card 2: Refresh Frequency (y: 595, height: 85) ─────────
+        let card2 = createCardView(frame: NSRect(x: 24, y: 595, width: 612, height: 85))
         
         let card2Title = createSectionHeader(title: "Refresh Frequency", iconName: "clock.fill", frame: NSRect(x: 16, y: 52, width: 580, height: 22))
         card2.addSubview(card2Title)
@@ -1063,8 +1549,8 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         
         contentView.addSubview(card2)
         
-        // ── Card 3: Daily Summary (y: 310, height: 135) ─────────────
-        let card3 = createCardView(frame: NSRect(x: 24, y: 310, width: 612, height: 135))
+        // ── Card 3: Daily Summary (y: 445, height: 135) ─────────────
+        let card3 = createCardView(frame: NSRect(x: 24, y: 445, width: 612, height: 135))
         
         let card3Title = createSectionHeader(title: "Daily Summary", iconName: "calendar.badge.clock", frame: NSRect(x: 16, y: 100, width: 580, height: 22))
         card3.addSubview(card3Title)
@@ -1097,8 +1583,8 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         
         contentView.addSubview(card3)
         
-        // ── Card 4: Alerts & Notifications (y: 65, height: 230) ──────
-        let card4 = createCardView(frame: NSRect(x: 24, y: 65, width: 612, height: 230))
+        // ── Card 4: Alerts & Notifications (y: 200, height: 230) ──────
+        let card4 = createCardView(frame: NSRect(x: 24, y: 200, width: 612, height: 230))
         
         let card4Title = createSectionHeader(title: "Alerts & Notifications", iconName: "bell.fill", frame: NSRect(x: 16, y: 194, width: 580, height: 22))
         card4.addSubview(card4Title)
@@ -1169,6 +1655,42 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         
         contentView.addSubview(card4)
         
+        // ── Card 5: Apple Employee / Internal Mode (y: 65, height: 120) ──
+        let card5 = createCardView(frame: NSRect(x: 24, y: 65, width: 612, height: 120))
+        
+        let card5Title = createSectionHeader(title: "Apple Employee (Internal Mode)", iconName: "lock.shield.fill", frame: NSRect(x: 16, y: 88, width: 580, height: 22))
+        card5.addSubview(card5Title)
+        
+        enableInternalModeCheckbox = NSButton(checkboxWithTitle: "Enable Internal Mode (careers.apple.com)", target: self, action: #selector(internalModeToggled))
+        enableInternalModeCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        enableInternalModeCheckbox.frame = NSRect(x: 20, y: 54, width: 330, height: 22)
+        card5.addSubview(enableInternalModeCheckbox)
+        
+        internalOnlyCheckbox = NSButton(checkboxWithTitle: "Internal roles only", target: self, action: nil)
+        internalOnlyCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        internalOnlyCheckbox.frame = NSRect(x: 360, y: 54, width: 230, height: 22)
+        card5.addSubview(internalOnlyCheckbox)
+        
+        internalAuthStatusLabel = NSTextField(labelWithString: "○ Not Signed In")
+        internalAuthStatusLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        internalAuthStatusLabel.textColor = .secondaryLabelColor
+        internalAuthStatusLabel.frame = NSRect(x: 20, y: 18, width: 270, height: 22)
+        card5.addSubview(internalAuthStatusLabel)
+        
+        signInAppleConnectBtn = NSButton(title: "Sign In with AppleConnect...", target: self, action: #selector(signInAppleConnectClicked))
+        signInAppleConnectBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        signInAppleConnectBtn.bezelStyle = .rounded
+        signInAppleConnectBtn.frame = NSRect(x: 295, y: 14, width: 205, height: 28)
+        card5.addSubview(signInAppleConnectBtn)
+        
+        disconnectAppleConnectBtn = NSButton(title: "Disconnect", target: self, action: #selector(disconnectAppleConnectClicked))
+        disconnectAppleConnectBtn.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        disconnectAppleConnectBtn.bezelStyle = .rounded
+        disconnectAppleConnectBtn.frame = NSRect(x: 505, y: 14, width: 95, height: 28)
+        card5.addSubview(disconnectAppleConnectBtn)
+        
+        contentView.addSubview(card5)
+        
         // ── Bottom Action Footer ──────────────────────────────────────
         launchAtLoginCheckbox = NSButton(checkboxWithTitle: "Launch at login", target: self, action: nil)
         launchAtLoginCheckbox.font = NSFont.systemFont(ofSize: 13, weight: .regular)
@@ -1219,6 +1741,27 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
     }
 
+    @objc func showCustomUrlPreview() {
+        let currentUrl = customUrlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayUrl = currentUrl.isEmpty ? "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest" : currentUrl
+        showCustomInfoModal(title: "Current Custom Search URL", contentText: displayUrl, isMonospaced: true)
+    }
+
+    @objc func showCustomUrlInstructions() {
+        let instructions = """
+        How to configure a Custom Apple Jobs Search:
+        
+        1. Open your browser and go to jobs.apple.com/en-us/search
+        2. Apply your desired search filters (e.g. keywords like 'Swift', 'AI/ML', specific teams, or multiple regions).
+        3. Ensure the sort order is set to 'Newest' on Apple's portal.
+        4. Copy the entire URL from your browser's address bar.
+        5. Select 'Custom URL' above and paste your link into the field.
+        
+        Jobs Monitor will track and alert you for new openings matching your custom query!
+        """
+        showCustomInfoModal(title: "Custom URL Instructions", contentText: instructions, isMonospaced: false)
+    }
+
     @objc func closeInfoModal(_ sender: NSButton) {
         NSApp.stopModal()
         sender.window?.orderOut(nil)
@@ -1226,14 +1769,10 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 
     func showCustomInfoModal(title: String, contentText: String, isMonospaced: Bool = false) {
         let winWidth: CGFloat = 540
-        
-        // Calculate required text height so entire message is visible without scrolling
         let font = isMonospaced ? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular) : NSFont.systemFont(ofSize: 12, weight: .regular)
         let constraintRect = CGSize(width: winWidth - 68, height: .greatestFiniteMagnitude)
         let boundingBox = (contentText as NSString).boundingRect(with: constraintRect, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font], context: nil)
         let textContentHeight = max(110, min(420, ceil(boundingBox.height) + 24))
-        
-        // Total window height accounting for top/bottom margins, 64px logo, 24px title, and generous 20px gaps
         let winHeight: CGFloat = textContentHeight + 216
         
         let modalWin = NSWindow(
@@ -1249,174 +1788,157 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         modalWin.backgroundColor = NSColor.windowBackgroundColor
         modalWin.center()
         
-        let contentView = modalWin.contentView!
+        let modalContent = NSView(frame: NSRect(x: 0, y: 0, width: winWidth, height: winHeight))
         
-        // 1. Top Centered App Logo (y: winHeight - 88, height: 64, top padding: 24px)
-        let logoSize: CGFloat = 64
-        let logoX = (winWidth - logoSize) / 2.0
-        let logoView = NSImageView(frame: NSRect(x: logoX, y: winHeight - 88, width: logoSize, height: logoSize))
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: winHeight - 90, width: winWidth, height: 90))
+        let iconView = NSImageView(frame: NSRect(x: (winWidth - 64) / 2.0, y: 13, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
-            logoView.image = img
+            iconView.image = img
         } else {
-            logoView.image = NSImage(systemSymbolName: "briefcase.fill", accessibilityDescription: nil)
+            iconView.image = NSImage(systemSymbolName: "briefcase.fill", accessibilityDescription: nil)
         }
-        contentView.addSubview(logoView)
+        headerView.addSubview(iconView)
         
-        // 2. Centered Modal Title (y: winHeight - 132, 20px gap below logo)
-        let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = NSFont.systemFont(ofSize: 15, weight: .bold)
-        titleLabel.alignment = .center
-        titleLabel.frame = NSRect(x: 20, y: winHeight - 132, width: winWidth - 40, height: 24)
-        contentView.addSubview(titleLabel)
+        let headerSep = NSBox(frame: NSRect(x: 0, y: 0, width: winWidth, height: 1))
+        headerSep.boxType = .separator
+        headerView.addSubview(headerSep)
+        modalContent.addSubview(headerView)
         
-        // 3. Content Area Box (y: 64, top is winHeight - 152, giving 20px gap below title)
-        let scrollView = NSScrollView(frame: NSRect(x: 24, y: 64, width: winWidth - 48, height: textContentHeight))
+        let modalTitleLabel = NSTextField(labelWithString: title)
+        modalTitleLabel.font = NSFont.systemFont(ofSize: 14, weight: .bold)
+        modalTitleLabel.alignment = .center
+        modalTitleLabel.frame = NSRect(x: 20, y: winHeight - 124, width: winWidth - 40, height: 22)
+        modalContent.addSubview(modalTitleLabel)
+        
+        let cardY: CGFloat = 68
+        let cardH: CGFloat = textContentHeight
+        let card = createCardView(frame: NSRect(x: 24, y: cardY, width: winWidth - 48, height: cardH))
+        
+        let scrollView = NSScrollView(frame: NSRect(x: 10, y: 10, width: winWidth - 68, height: cardH - 20))
         scrollView.hasVerticalScroller = true
-        scrollView.borderType = .bezelBorder
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
         
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: winWidth - 48, height: textContentHeight))
+        let textView = NSTextView(frame: scrollView.contentView.bounds)
         textView.isEditable = false
         textView.isSelectable = true
-        textView.string = contentText
+        textView.drawsBackground = false
         textView.font = font
         textView.textColor = .labelColor
-        
+        textView.string = contentText
+        textView.textContainer?.containerSize = NSSize(width: winWidth - 68, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
         scrollView.documentView = textView
-        contentView.addSubview(scrollView)
+        card.addSubview(scrollView)
         
-        // 4. Centered OK Button (y: 16, height: 32, 16px gap below text box)
-        let okBtnWidth: CGFloat = 100
-        let okBtnX = (winWidth - okBtnWidth) / 2.0
-        let okBtn = NSButton(title: "OK", target: self, action: #selector(closeInfoModal))
-        okBtn.frame = NSRect(x: okBtnX, y: 16, width: okBtnWidth, height: 32)
+        modalContent.addSubview(card)
+        
+        let okBtn = NSButton(title: "OK", target: self, action: #selector(closeInfoModal(_:)))
         okBtn.bezelStyle = .rounded
+        okBtn.frame = NSRect(x: (winWidth - 90) / 2.0, y: 18, width: 90, height: 32)
         okBtn.keyEquivalent = "\r"
-        contentView.addSubview(okBtn)
+        modalContent.addSubview(okBtn)
         
+        modalWin.contentView = modalContent
         NSApp.runModal(for: modalWin)
-        modalWin.orderOut(nil)
     }
 
-    @objc func showCustomUrlPreview() {
-        let currentUrl = customUrlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let text = currentUrl.isEmpty ? "No URL pasted yet.\nSelect 'Custom URL' and paste a search link from jobs.apple.com." : currentUrl
-        showCustomInfoModal(title: "Full Custom Search URL", contentText: text, isMonospaced: !currentUrl.isEmpty)
-    }
-
-    @objc func showCustomUrlInstructions() {
-        let text = """
-        You can monitor specific job titles, teams, or custom search criteria by using a custom URL from Apple Jobs.
-
-        Instructions:
-        1. Open jobs.apple.com in your web browser.
-        2. Search for your desired role or keywords (for example: "Python" or "iOS").
-        3. Copy the complete URL from your browser's address bar.
-        4. Select "Custom URL" in Jobs Monitor and paste the link.
-
-        Note:
-        Apple's search engine automatically scans your keywords across job titles, descriptions, responsibilities, and qualifications.
-        """
-        showCustomInfoModal(title: "Custom Search URLs", contentText: text, isMonospaced: false)
-    }
-    
     @objc func showNotificationStyleInfo() {
-        let text = """
-        Jobs Monitor provides two notification delivery modes when new job openings are detected:
-
-        • Mid-Screen Popup Window (Default)
-        Displays an interactive alert window in the center of your screen. Mid-screen popup windows bypass macOS Do Not Disturb settings to ensure urgent postings are noticed immediately.
-
-        • System Notification Banner
-        Delivers standard macOS system notifications in the upper-right corner of your screen. System notification banners adhere to your macOS Do Not Disturb schedule.
+        let content = """
+        Delivery Styles:
+        
+        • System Notification Banner: Standard macOS notification banner in the top-right corner. Automatically routed through Notification Center and respects macOS Do Not Disturb & Focus modes.
+        
+        • Mid-Screen Popup Window: A prominent dialog appearing in the center of your screen with app icon, dismiss countdown, and quick-action buttons. Guaranteed to be noticed even when DND is active.
         """
-        showCustomInfoModal(title: "Notification Delivery Styles", contentText: text, isMonospaced: false)
+        showCustomInfoModal(title: "Notification Delivery Styles", contentText: content, isMonospaced: false)
     }
 
     @objc func previewNotificationStyle() {
-        let style = notificationStylePopUp.indexOfSelectedItem
-        let soundName = soundPopUp.indexOfSelectedItem >= 0 && soundPopUp.indexOfSelectedItem < availableSounds.count ? availableSounds[soundPopUp.indexOfSelectedItem].nameOrPath : "Default"
-        let vol = volumeSlider.floatValue
+        let isSystemBanner = notificationStylePopUp.indexOfSelectedItem == 0
+        let currentVol = volumeSlider.floatValue
         
-        playNotificationSound(soundName, volume: vol)
+        var selectedSoundPath = ""
+        let idx = soundPopUp.indexOfSelectedItem
+        if idx >= 0 && idx < availableSounds.count {
+            selectedSoundPath = availableSounds[idx].nameOrPath
+        }
         
-        if style == 0 {
+        playNotificationSound(selectedSoundPath, volume: currentVol)
+        
+        if isSystemBanner {
             let content = UNMutableNotificationContent()
-            content.title = " Jobs Monitor (Banner Preview)"
-            content.body = "This is a sample System Notification Banner! Banners appear in the upper-right corner of your screen."
+            content.title = " Jobs Monitor Preview"
+            content.body = "This is a test of the System Notification Banner alert style."
             
             let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error = error {
-                    logMessage("UNNotification error: \(error.localizedDescription)")
+                    logMessage("Notification Preview dispatch error: \(error.localizedDescription)")
                 }
             }
         } else {
             let alert = NSAlert()
-            alert.messageText = " 3 New Apple Jobs!"
-            alert.informativeText = "3 brand new roles posted for your target location!\n\n(This is a live preview of the Mid-Screen Popup Window alert)"
+            alert.messageText = " Jobs Monitor Preview"
+            alert.informativeText = "This is a test of the Mid-Screen Popup Window alert style."
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "View Dashboard")
-            alert.addButton(withTitle: "Dismiss")
+            alert.addButton(withTitle: "OK")
             
             let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
             if let img = NSImage(contentsOfFile: iconPath) {
                 alert.icon = img
             }
-            
-            // Auto-dismiss preview if configured
-            var dismissSecs = 300
-            switch dismissPopUp.indexOfSelectedItem {
-            case 0: dismissSecs = 10
-            case 1: dismissSecs = 30
-            case 2: dismissSecs = 60
-            case 3: dismissSecs = 180
-            case 5: dismissSecs = 600
-            case 6: dismissSecs = 0
-            default: dismissSecs = 300
-            }
-            
-            if dismissSecs > 0 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(dismissSecs)) {
-                    if let window = alert.window.sheetParent ?? NSApp.windows.first(where: { $0.title == " 3 New Apple Jobs!" }) {
-                        window.close()
-                    }
-                }
-            }
-            
             alert.runModal()
         }
     }
 
-    private var volumePreviewTimer: Timer?
-
     @objc func notificationStyleChanged(_ sender: NSPopUpButton) {
-        let isPopup = (sender.indexOfSelectedItem == 1)
-        dismissPopUp.isEnabled = isPopup
-        dismissLabel.textColor = isPopup ? .labelColor : .secondaryLabelColor
+        let isSystemBanner = (sender.indexOfSelectedItem == 0)
+        dismissLabel.isHidden = isSystemBanner
+        dismissPopUp.isHidden = isSystemBanner
     }
 
     @objc func volumeSliderChanged(_ sender: NSSlider) {
         let pct = Int(sender.floatValue * 100)
         volumeValueLabel.stringValue = "\(pct)%"
-        
+        debouncedSoundPreview()
+    }
+
+    @objc func soundPopUpChanged(_ sender: NSPopUpButton) {
+        debouncedSoundPreview()
+    }
+
+    var volumePreviewTimer: Timer?
+    func debouncedSoundPreview() {
         volumePreviewTimer?.invalidate()
-        let currentVol = sender.floatValue
-        volumePreviewTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { [weak self] _ in
+        volumePreviewTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             let idx = self.soundPopUp.indexOfSelectedItem
             if idx >= 0 && idx < availableSounds.count {
-                playNotificationSound(availableSounds[idx].nameOrPath, volume: currentVol)
+                playNotificationSound(availableSounds[idx].nameOrPath, volume: self.volumeSlider.floatValue)
             }
         }
     }
 
-    @objc func soundPopUpChanged(_ sender: NSPopUpButton) {
-        volumePreviewTimer?.invalidate()
-        let idx = sender.indexOfSelectedItem
-        if idx >= 0 && idx < availableSounds.count {
-            playNotificationSound(availableSounds[idx].nameOrPath, volume: volumeSlider.floatValue)
+    @objc func radioChanged(_ sender: NSButton) {
+        countryPopUp.isEnabled = (sender.tag == 0)
+        cityPopUp.isEnabled = (sender.tag == 1)
+        customUrlField.isEnabled = (sender.tag == 2)
+        customUrlInstructionsBtn.isEnabled = true
+    }
+
+    @objc func dailyCheckToggled(_ sender: NSButton) {
+        let enabled = (sender.state == .on)
+        timePopUp.isEnabled = enabled
+        for btn in dayButtons {
+            btn.isEnabled = enabled
         }
+    }
+
+    @objc func dayButtonToggled(_ sender: NSButton) {
+        // Toggle handled by button state
     }
     
     @objc func cancelClicked() {
@@ -1425,27 +1947,50 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         window?.close()
     }
     
-    @objc func radioChanged(_ sender: NSButton) {
-        radioCountry.state = (sender.tag == 0) ? .on : .off
-        radioCity.state = (sender.tag == 1) ? .on : .off
-        radioCustom.state = (sender.tag == 2) ? .on : .off
-        
-        countryPopUp.isEnabled = (sender.tag == 0)
-        cityPopUp.isEnabled = (sender.tag == 1)
-        customUrlField.isEnabled = (sender.tag == 2)
-        customUrlInstructionsBtn.isEnabled = true
+    @objc func internalModeToggled() {
+        let isEnabled = enableInternalModeCheckbox.state == .on
+        internalOnlyCheckbox.isEnabled = isEnabled
+        signInAppleConnectBtn.isEnabled = isEnabled
+        disconnectAppleConnectBtn.isEnabled = isEnabled
     }
     
-    @objc func dailyCheckToggled(_ sender: NSButton) {
-        let enabled = (sender.state == .on)
-        timePopUp.isEnabled = enabled
-        for btn in dayButtons {
-            btn.isEnabled = enabled
+    func updateInternalAuthUI() {
+        let isEnabled = enableInternalModeCheckbox.state == .on
+        internalOnlyCheckbox.isEnabled = isEnabled
+        signInAppleConnectBtn.isEnabled = isEnabled
+        disconnectAppleConnectBtn.isEnabled = isEnabled
+        
+        let state = loadStateData()
+        let isAuth = state.isAppleConnectAuthenticated ?? false
+        
+        if isAuth {
+            internalAuthStatusLabel.stringValue = "● Authenticated with AppleConnect"
+            internalAuthStatusLabel.textColor = .systemGreen
+            signInAppleConnectBtn.title = "Re-authenticate..."
+            disconnectAppleConnectBtn.isHidden = false
+        } else {
+            internalAuthStatusLabel.stringValue = "○ Not Signed In"
+            internalAuthStatusLabel.textColor = .secondaryLabelColor
+            signInAppleConnectBtn.title = "Sign In with AppleConnect..."
+            disconnectAppleConnectBtn.isHidden = true
         }
     }
     
-    @objc func dayButtonToggled(_ sender: NSButton) {
-        // Toggle visual state
+    @objc func signInAppleConnectClicked() {
+        if authWindowController == nil {
+            authWindowController = AppleConnectAuthWindowController()
+        }
+        let settings = loadSettings()
+        authWindowController?.onAuthCompletion = { [weak self] _ in
+            self?.updateInternalAuthUI()
+        }
+        authWindowController?.startAuthentication(targetUrl: settings.activeCareersUrl)
+    }
+    
+    @objc func disconnectAppleConnectClicked() {
+        AppleConnectAuthWindowController.clearSession { [weak self] in
+            self?.updateInternalAuthUI()
+        }
     }
     
     func loadCurrentValues() {
@@ -1519,6 +2064,10 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             btn.isEnabled = s.enableDailyCheck
         }
         
+        enableInternalModeCheckbox.state = s.enableInternalMode ? .on : .off
+        internalOnlyCheckbox.state = s.internalOnly ? .on : .off
+        updateInternalAuthUI()
+        
         launchAtLoginCheckbox.state = s.launchAtLogin ? .on : .off
     }
     
@@ -1563,15 +2112,15 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             s.notificationSound = availableSounds[selectedSoundIdx].nameOrPath
         }
         s.notificationVolume = volumeSlider.floatValue
-        if selectedSoundIdx >= 0 && selectedSoundIdx < availableSounds.count {
-            s.notificationSound = availableSounds[selectedSoundIdx].nameOrPath
-        }
         
         s.enableDailyCheck = (dailyCheckCheckbox.state == .on)
         let selectedTimeOpt = timeOptions[max(0, min(timePopUp.indexOfSelectedItem, timeOptions.count - 1))]
         s.dailyCheckHour = selectedTimeOpt.hour
         s.dailyCheckMinute = selectedTimeOpt.minute
         s.activeDays = dayButtons.map { $0.state == .on }
+        
+        s.enableInternalMode = (enableInternalModeCheckbox.state == .on)
+        s.internalOnly = (internalOnlyCheckbox.state == .on)
         
         let launchLogin = (launchAtLoginCheckbox.state == .on)
         s.launchAtLogin = launchLogin
@@ -1721,6 +2270,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         prefItem.target = self
         menu.addItem(prefItem)
         
+        let settings = loadSettings()
+        if settings.enableInternalMode {
+            let isAuth = (state.isAppleConnectAuthenticated ?? false) && (state.ssoSessionExpired != true)
+            let modeTitle = isAuth ? "Internal Mode: Active " : "⚠️ AppleConnect Session Expired"
+            let modeItem = NSMenuItem(title: modeTitle, action: #selector(openPreferences), keyEquivalent: "")
+            modeItem.image = NSImage(systemSymbolName: isAuth ? "apple.logo" : "exclamationmark.triangle.fill", accessibilityDescription: nil)
+            modeItem.target = self
+            menu.addItem(modeItem)
+        }
+        
         menu.addItem(NSMenuItem.separator())
         
         // About Item with Icon
@@ -1745,7 +2304,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         statusItem.menu = menu
     }
     
-    func menuWillOpen(_ menu: NSMenu) {
+    @objc func menuWillOpen(_ menu: NSMenu) {
         let state = loadStateData()
         var lastCheckedText = state.last_checked_str ?? "Just now"
         if lastCheckedText.contains("AM") || lastCheckedText.contains("PM") || lastCheckedText == "Never" {
@@ -2065,6 +2624,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 self?.performCheck(isManual: true)
             }
         }
+        settingsWindowController?.loadCurrentValues()
         settingsWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -2083,106 +2643,226 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     
     func performCheck(isManual: Bool) {
         let settings = loadSettings()
-        let baseUrlStr = settings.activeUrl
-        logMessage("Fetching roles for \(settings.locationTitle)...")
+        logMessage("Fetching roles for \(settings.locationTitle) (Internal Mode: \(settings.enableInternalMode ? "ON" : "OFF"))...")
         
-        var combinedJobs: [JobItem] = []
+        let publicBaseUrl = settings.activeUrl
+        let internalBaseUrl = settings.activeCareersUrl
+        
+        var publicJobs: [JobItem] = []
+        var internalJobs: [JobItem] = []
+        var ssoExpiredDetected = false
         let group = DispatchGroup()
         let lock = NSLock()
         
-        for page in 1...2 {
-            let sep = baseUrlStr.contains("?") ? "&" : "?"
-            let pageUrlStr = "\(baseUrlStr)\(sep)page=\(page)"
-            guard let url = URL(string: pageUrlStr) else { continue }
-            
-            var request = URLRequest(url: url, timeoutInterval: 30)
-            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
-            
-            group.enter()
-            URLSession.shared.dataTask(with: request) { data, response, error in
-                defer { group.leave() }
-                guard let data = data, error == nil,
-                      let html = String(data: data, encoding: .utf8) else {
-                    if let err = error {
-                        logMessage("Fetch page \(page) error: \(err.localizedDescription)")
+        func fetchChannel(baseUrlStr: String, isInternalChannel: Bool, cookies: [HTTPCookie]? = nil) {
+            for page in 1...3 {
+                let sep = baseUrlStr.contains("?") ? "&" : "?"
+                let pageUrlStr = "\(baseUrlStr)\(sep)page=\(page)"
+                guard let url = URL(string: pageUrlStr) else { continue }
+                
+                var request = URLRequest(url: url, timeoutInterval: 30)
+                request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+                
+                if let cookies = cookies, !cookies.isEmpty {
+                    let headerFields = HTTPCookie.requestHeaderFields(with: cookies)
+                    for (k, v) in headerFields {
+                        request.setValue(v, forHTTPHeaderField: k)
                     }
-                    return
                 }
                 
-                let pageJobs = parseJobsFromHTML(html, defaultSearchUrl: baseUrlStr, settings: settings)
-                lock.lock()
-                combinedJobs.append(contentsOf: pageJobs)
-                lock.unlock()
-            }.resume()
+                group.enter()
+                URLSession.shared.dataTask(with: request) { data, response, error in
+                    defer { group.leave() }
+                    guard let data = data, error == nil,
+                          let html = String(data: data, encoding: .utf8) else {
+                        if let err = error {
+                            logMessage("Fetch \(isInternalChannel ? "internal" : "public") page \(page) error: \(err.localizedDescription)")
+                        }
+                        return
+                    }
+                    
+                    let pageJobs = parseJobsFromHTML(html, defaultSearchUrl: baseUrlStr, settings: settings, isInternal: isInternalChannel)
+                    
+                    if isInternalChannel && pageJobs.isEmpty {
+                        let lowerHtml = html.lowercased()
+                        if lowerHtml.contains("sign in with your apple account") || lowerHtml.contains("appleid.apple.com/auth/authorize") || lowerHtml.contains("login.apple.com") {
+                            lock.lock()
+                            ssoExpiredDetected = true
+                            lock.unlock()
+                        }
+                    }
+                    
+                    lock.lock()
+                    if isInternalChannel {
+                        internalJobs.append(contentsOf: pageJobs)
+                    } else {
+                        publicJobs.append(contentsOf: pageJobs)
+                    }
+                    lock.unlock()
+                }.resume()
+            }
         }
         
-        group.notify(queue: .main) { [weak self] in
-            guard let self = self else { return }
-            
-            // Deduplicate combined jobs by ID while preserving order
-            var seen = Set<String>()
-            var uniqueJobs: [JobItem] = []
-            for j in combinedJobs {
-                if !seen.contains(j.id) {
-                    seen.insert(j.id)
-                    uniqueJobs.append(j)
+        if settings.enableInternalMode {
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
+                let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
+                
+                if !settings.internalOnly {
+                    fetchChannel(baseUrlStr: publicBaseUrl, isInternalChannel: false)
+                }
+                fetchChannel(baseUrlStr: internalBaseUrl, isInternalChannel: true, cookies: appleCookies)
+                
+                group.notify(queue: .main) {
+                    self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, ssoExpiredDetected: ssoExpiredDetected, settings: settings, isManual: isManual)
                 }
             }
+        } else {
+            fetchChannel(baseUrlStr: publicBaseUrl, isInternalChannel: false)
             
-            // Sort newest to oldest by posting date
-            let jobs = uniqueJobs.sorted { j1, j2 in
-                let d1 = parsePostedDate(j1.posted)
-                let d2 = parsePostedDate(j2.posted)
-                if d1 != d2 { return d1 > d2 }
-                return j1.id > j2.id
+            group.notify(queue: .main) { [weak self] in
+                self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, ssoExpiredDetected: false, settings: settings, isManual: isManual)
             }
-            
-            logMessage("Fetched \(jobs.count) total roles for \(settings.locationTitle)")
-            
-            var state = loadStateData()
-            let isFirstRun = state.seen_ids.isEmpty
-            let seenSet = Set(state.seen_ids)
-            
-            let newJobs = isFirstRun ? [] : jobs.filter { !seenSet.contains($0.id) }
-            
-            let now = Date()
-            let formatter = DateFormatter()
-            formatter.dateFormat = "d MMM, HH:mm"
-            let timeStr = formatter.string(from: now)
-            state.last_checked_str = timeStr
-            state.last_job_count = jobs.count
-            state.last_check_timestamp = now.timeIntervalSince1970
-            
-            let currentUnread = (state.unread_count ?? 0) + newJobs.count
-            state.unread_count = currentUnread
-            state.seen_ids = Array(Set(state.seen_ids + jobs.map { $0.id }))
-            saveStateData(state)
-            
-            self.updateBadge(unreadCount: currentUnread)
-            self.rebuildMenu()
-            
-            let firstName = getUserFirstName()
-            let displayCount = min(30, jobs.count)
-            let greeting = "Hi \(firstName) 👋 — \(displayCount) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>:"
-            let htmlStr = generateDashboardHTML(jobs: jobs.isEmpty ? [] : Array(jobs.prefix(30)),
-                                                 greeting: greeting,
-                                                 locationTitle: settings.locationTitle,
-                                                 searchUrl: settings.activeUrl)
-            
-            try? htmlStr.write(to: dashboardFile, atomically: true, encoding: .utf8)
-            
-            if !newJobs.isEmpty {
-                let plural = newJobs.count > 1 ? "s" : ""
-                self.showNativeAlert(
-                    title: " \(newJobs.count) New Apple Job\(plural)!",
-                    message: "\(newJobs.count) brand new role\(plural) posted for \(settings.locationTitle)!"
-                )
-            } else if isManual {
-                self.showNativeAlert(
-                    title: " Jobs Monitor (\(settings.locationTitle))",
-                    message: "No new openings since last check. Dashboard is ready with latest \(jobs.count) roles!"
-                )
+        }
+    }
+    
+    func processFetchedJobs(publicJobs: [JobItem], internalJobs: [JobItem], ssoExpiredDetected: Bool, settings: AppSettings, isManual: Bool) {
+        // 1. Deduplicate & sort public jobs
+        var publicMap: [String: JobItem] = [:]
+        var publicOrder: [String] = []
+        for j in publicJobs {
+            if publicMap[j.id] == nil {
+                publicMap[j.id] = j
+                publicOrder.append(j.id)
             }
+        }
+        let sortedPublic = publicOrder.compactMap { publicMap[$0] }.sorted { j1, j2 in
+            let d1 = parsePostedDate(j1.posted)
+            let d2 = parsePostedDate(j2.posted)
+            if d1 != d2 { return d1 > d2 }
+            return j1.id > j2.id
+        }
+        let top40Public = Array(sortedPublic.prefix(40))
+        
+        // 2. Deduplicate & sort internal jobs
+        var internalMap: [String: JobItem] = [:]
+        var internalOrder: [String] = []
+        for j in internalJobs {
+            if internalMap[j.id] == nil {
+                internalMap[j.id] = j
+                internalOrder.append(j.id)
+            }
+        }
+        let sortedInternal = internalOrder.compactMap { internalMap[$0] }.sorted { j1, j2 in
+            let d1 = parsePostedDate(j1.posted)
+            let d2 = parsePostedDate(j2.posted)
+            if d1 != d2 { return d1 > d2 }
+            return j1.id > j2.id
+        }
+        let top40Internal = Array(sortedInternal.prefix(40))
+        
+        let publicIdSet = Set(top40Public.map { $0.id })
+        let internalIdSet = Set(top40Internal.map { $0.id })
+        
+        // Build unified list for dashboard
+        var unifiedMap: [String: JobItem] = [:]
+        var unifiedOrder: [String] = []
+        
+        for j in (top40Internal + top40Public) {
+            if let existing = unifiedMap[j.id] {
+                if existing.isInternal != true && j.isInternal == true {
+                    unifiedMap[j.id] = j
+                }
+            } else {
+                unifiedMap[j.id] = j
+                unifiedOrder.append(j.id)
+            }
+        }
+        
+        var displayJobs = unifiedOrder.compactMap { unifiedMap[$0] }.sorted { j1, j2 in
+            let d1 = parsePostedDate(j1.posted)
+            let d2 = parsePostedDate(j2.posted)
+            if d1 != d2 { return d1 > d2 }
+            return j1.id > j2.id
+        }
+        
+        if settings.enableInternalMode && settings.internalOnly {
+            displayJobs = top40Internal
+        } else if !settings.enableInternalMode {
+            displayJobs = top40Public
+        }
+        
+        let totalUniqueRoles = displayJobs.count
+        if settings.enableInternalMode {
+            logMessage("Fetched \(totalUniqueRoles) total active roles (\(top40Internal.count) top internal, \(top40Public.count) top public) for \(settings.locationTitle)")
+        } else {
+            logMessage("Fetched \(displayJobs.count) total roles for \(settings.locationTitle)")
+        }
+        
+        var state = loadStateData()
+        let isFirstRun = state.seen_ids.isEmpty
+        let seenSet = Set(state.seen_ids)
+        
+        let newJobs = isFirstRun ? [] : displayJobs.filter { !seenSet.contains($0.id) }
+        
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM, HH:mm"
+        let timeStr = formatter.string(from: now)
+        state.last_checked_str = timeStr
+        state.last_job_count = displayJobs.count
+        state.last_check_timestamp = now.timeIntervalSince1970
+        
+        if settings.enableInternalMode {
+            if ssoExpiredDetected || (internalJobs.isEmpty && (state.isAppleConnectAuthenticated == true)) {
+                state.ssoSessionExpired = true
+                logMessage("⚠️ AppleConnect SSO session appears expired. Re-authentication needed.")
+            } else if !internalJobs.isEmpty {
+                state.ssoSessionExpired = false
+                state.isAppleConnectAuthenticated = true
+            }
+        }
+        
+        let currentUnread = (state.unread_count ?? 0) + newJobs.count
+        state.unread_count = currentUnread
+        state.seen_ids = Array(Set(state.seen_ids + displayJobs.map { $0.id }))
+        saveStateData(state)
+        
+        updateBadge(unreadCount: currentUnread)
+        rebuildMenu()
+        
+        let firstName = getUserFirstName()
+        let modeSubtitle = settings.enableInternalMode ? (settings.internalOnly ? " [Internal Only]" : " [Public + Internal]") : ""
+        let greeting = settings.enableInternalMode && !settings.internalOnly
+            ? "Hi \(firstName) 👋 — \(top40Internal.count) Internal & \(top40Public.count) Public active roles tracked for <strong>\(settings.locationTitle)</strong>:"
+            : "Hi \(firstName) 👋 — \(min(40, displayJobs.count)) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>\(modeSubtitle):"
+            
+        let searchDisplayUrl = settings.enableInternalMode ? settings.activeCareersUrl : settings.activeUrl
+        let htmlStr = generateDashboardHTML(jobs: displayJobs,
+                                             internalIdSet: internalIdSet,
+                                             publicIdSet: publicIdSet,
+                                             internalTotalCount: top40Internal.count,
+                                             publicTotalCount: top40Public.count,
+                                             enableInternalMode: settings.enableInternalMode,
+                                             internalOnly: settings.internalOnly,
+                                             greeting: greeting,
+                                             locationTitle: "\(settings.locationTitle)\(modeSubtitle)",
+                                             searchUrl: searchDisplayUrl)
+        
+        try? htmlStr.write(to: dashboardFile, atomically: true, encoding: .utf8)
+        
+        if !newJobs.isEmpty {
+            let plural = newJobs.count > 1 ? "s" : ""
+            let internalNewCount = newJobs.filter { internalIdSet.contains($0.id) || ($0.isInternal == true) }.count
+            let internalNote = internalNewCount > 0 ? " (\(internalNewCount)  internal)" : ""
+            showNativeAlert(
+                title: " \(newJobs.count) New Apple Job\(plural)!",
+                message: "\(newJobs.count) brand new role\(plural) posted for \(settings.locationTitle)\(internalNote)!"
+            )
+        } else if isManual {
+            showNativeAlert(
+                title: " Jobs Monitor (\(settings.locationTitle))",
+                message: "No new openings since last check. Dashboard is ready with latest roles!"
+            )
         }
     }
     

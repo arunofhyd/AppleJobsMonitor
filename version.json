@@ -1,7 +1,19 @@
 {
-  "version": "2.1.9",
+  "version": "2.2.0",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.2.0",
+      "date": "2026-08-17",
+      "changes": [
+        "Interactive 3-Pill Filter: Segmented tabs for Both / All,  Internal (top 40), and 🌐 Public (top 40) roles with independent 40-role quotas.",
+        "Live Instant Search: Real-time search filter directly on the dashboard to quickly filter roles by title, department, or city.",
+        "3-Tier Badges & Action Buttons: Clean distinction between  Internal Only,  Internal + 🌐 Public, and 🌐 Public Only roles with dedicated Internal ↗ and Public ↗ portal buttons.",
+        "Mode-Adaptive Dashboard: Automatically hides internal filter controls when Internal Mode is disabled for public job seekers.",
+        "AppleConnect SSO Session Health: Actively monitors SSO cookie validity and provides quick re-authentication in the menu bar if expired.",
+        "Preference Revert on Close: Unsaved checkbox changes in Preferences are discarded if closed or cancelled."
+      ]
+    },
     {
       "version": "2.1.9",
       "date": "2026-08-14",
