@@ -592,7 +592,8 @@ func generateDashboardHTML(
     internalOnly: Bool,
     greeting: String,
     locationTitle: String,
-    searchUrl: String
+    publicSearchUrl: String,
+    careersSearchUrl: String
 ) -> String {
     let totalCount = jobs.count
     
@@ -605,16 +606,18 @@ func generateDashboardHTML(
         let publicUrl = j.url.replacingOccurrences(of: "careers.apple.com", with: "jobs.apple.com")
         let primaryUrl = inInternal ? internalUrl : publicUrl
         
+        let groupFilledIconSvg = "<svg class=\"portal-icon\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7Zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216ZM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z\"/></svg>"
+        
         let portalHtml: String
         if inInternal && !inPublic {
             // Scenario 1: Exclusive to AppleConnect Internal Portal
             portalHtml = "<a href=\"\(internalUrl)\" class=\"portal-badge portal-internal\" target=\"_blank\"> Internal ↗</a>"
         } else if inInternal && inPublic {
             // Scenario 2: Listed on Both Internal & Public
-            portalHtml = "<div class=\"portal-badge-group\"><a href=\"\(internalUrl)\" class=\"portal-badge portal-internal\" target=\"_blank\"> Internal ↗</a><a href=\"\(publicUrl)\" class=\"portal-badge portal-public\" target=\"_blank\">🌐 Public ↗</a></div>"
+            portalHtml = "<div class=\"portal-badge-group\"><a href=\"\(internalUrl)\" class=\"portal-badge portal-internal\" target=\"_blank\"> Internal ↗</a><a href=\"\(publicUrl)\" class=\"portal-badge portal-public\" target=\"_blank\">\(groupFilledIconSvg)Public ↗</a></div>"
         } else {
             // Scenario 3: Public Only
-            portalHtml = "<a href=\"\(publicUrl)\" class=\"portal-badge portal-public\" target=\"_blank\">🌐 Public ↗</a>"
+            portalHtml = "<a href=\"\(publicUrl)\" class=\"portal-badge portal-public\" target=\"_blank\">\(groupFilledIconSvg)Public ↗</a>"
         }
         
         rows += """
@@ -633,6 +636,8 @@ func generateDashboardHTML(
     }
     
     let nowStr = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .short)
+    
+    let groupFilledIconSvg = "<svg class=\"portal-icon\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7Zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216ZM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z\"/></svg>"
     
     var filterBarHtml = ""
     if !enableInternalMode {
@@ -663,7 +668,7 @@ func generateDashboardHTML(
           <div class="filter-group">
             <button class="filter-pill active" onclick="setFilter('all', this)">Both / All <span class="pill-count">\(totalCount)</span></button>
             <button class="filter-pill" onclick="setFilter('internal', this)"> Internal <span class="pill-count">\(internalTotalCount)</span></button>
-            <button class="filter-pill" onclick="setFilter('public', this)">🌐 Public <span class="pill-count">\(publicTotalCount)</span></button>
+            <button class="filter-pill" onclick="setFilter('public', this)">\(groupFilledIconSvg)Public <span class="pill-count">\(publicTotalCount)</span></button>
           </div>
           <div class="search-box-wrapper">
             <span class="search-icon">🔍</span>
@@ -681,7 +686,7 @@ func generateDashboardHTML(
     if !enableInternalMode {
         footerBannerHtml = """
         <div style="padding: 20px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
-          <strong style="color: var(--text-main);">Job Links:</strong> Clicking any <strong>job title</strong> or <span class="portal-badge portal-public" style="margin: 0 4px; pointer-events: none;">🌐 Public ↗</span> badge opens the role directly on <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
+          <strong style="color: var(--text-main);">Job Links:</strong> Clicking any <strong>job title</strong> or <span class="portal-badge portal-public" style="margin: 0 4px; pointer-events: none;">\(groupFilledIconSvg)Public ↗</span> badge opens the role directly on <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
         </div>
         """
     } else if internalOnly {
@@ -698,7 +703,7 @@ func generateDashboardHTML(
             • <span class="portal-badge portal-internal" style="margin: 0 4px; pointer-events: none;"> Internal ↗</span> Roles available on Apple employee portal at <a href="https://careers.apple.com" target="_blank" style="color: #af52de; font-weight: 600; text-decoration: none;">careers.apple.com ↗</a> (AppleConnect SSO).
           </div>
           <div style="margin-bottom: 6px;">
-            • <span class="portal-badge portal-public" style="margin: 0 4px; pointer-events: none;">🌐 Public ↗</span> Roles open on the public jobs site at <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
+            • <span class="portal-badge portal-public" style="margin: 0 4px; pointer-events: none;">\(groupFilledIconSvg)Public ↗</span> Roles open on the public jobs site at <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
           </div>
           <div>
             • Roles displaying <strong>both</strong> badges are open across both internal employee and public applicant portals. Click either badge to visit that portal!
@@ -880,6 +885,13 @@ func generateDashboardHTML(
         line-height: 1.3;
         white-space: nowrap;
       }
+      .portal-icon {
+        width: 12px;
+        height: 12px;
+        margin-right: 4px;
+        vertical-align: -1px;
+        display: inline-block;
+      }
       .portal-internal {
         background: rgba(175, 82, 222, 0.12);
         color: #af52de !important;
@@ -930,7 +942,7 @@ func generateDashboardHTML(
             </tbody>
           </table>
           <div class="btn-wrapper">
-            <a href="\(searchUrl)" class="btn">View All Apple Jobs →</a>
+            <a href="\(internalOnly ? careersSearchUrl : publicSearchUrl)" id="view-all-jobs-btn" class="btn" target="_blank">\(internalOnly ? "View All Internal Apple Jobs (careers.apple.com) →" : "View All Apple Jobs (jobs.apple.com) →")</a>
           </div>
         </div>
         \(footerBannerHtml)
@@ -942,11 +954,25 @@ func generateDashboardHTML(
       
       <script>
         var activeFilter = 'all';
+        var publicSearchUrl = "\(publicSearchUrl)";
+        var careersSearchUrl = "\(careersSearchUrl)";
         
         function setFilter(type, btn) {
           document.querySelectorAll('.filter-pill').forEach(function(el) { el.classList.remove('active'); });
           if (btn) btn.classList.add('active');
           activeFilter = type;
+          
+          var viewAllBtn = document.getElementById('view-all-jobs-btn');
+          if (viewAllBtn) {
+            if (activeFilter === 'internal') {
+              viewAllBtn.href = careersSearchUrl;
+              viewAllBtn.textContent = 'View All Internal Apple Jobs (careers.apple.com) →';
+            } else {
+              viewAllBtn.href = publicSearchUrl;
+              viewAllBtn.textContent = 'View All Apple Jobs (jobs.apple.com) →';
+            }
+          }
+          
           filterDashboard();
         }
         
@@ -3083,7 +3109,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             ? "Hi \(firstName) 👋 — \(top40Internal.count) Internal & \(top40Public.count) Public active roles tracked for <strong>\(settings.locationTitle)</strong>:"
             : "Hi \(firstName) 👋 — \(min(40, displayJobs.count)) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>\(modeSubtitle):"
             
-        let searchDisplayUrl = effectiveInternalMode ? settings.activeCareersUrl : settings.activeUrl
         let htmlStr = generateDashboardHTML(jobs: displayJobs,
                                              internalIdSet: internalIdSet,
                                              publicIdSet: publicIdSet,
@@ -3093,7 +3118,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                                              internalOnly: settings.internalOnly && effectiveInternalMode,
                                              greeting: greeting,
                                              locationTitle: "\(settings.locationTitle)\(modeSubtitle)",
-                                             searchUrl: searchDisplayUrl)
+                                             publicSearchUrl: settings.activeUrl,
+                                             careersSearchUrl: settings.activeCareersUrl)
         
         try? htmlStr.write(to: dashboardFile, atomically: true, encoding: .utf8)
         
