@@ -6,7 +6,7 @@ import UserNotifications
 import WebKit
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.2.2"
+let APP_VERSION = "2.2.3"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -1164,68 +1164,156 @@ func normalizeJob(_ raw: [String: Any], defaultUrl: String, isInternal: Bool = f
     return JobItem(id: pid, title: title, team: teamStr, location: locStr, posted: posted, url: url, countries: extractedCountries, cities: extractedCities, isInternal: isInternal)
 }
 
-// ── ClipLocal-Style Native About Window ─────────────────────────────────────────
+// ── Native Modern About Window ─────────────────────────────────────────
 class AboutWindowController: NSWindowController {
     convenience init() {
+        let width: CGFloat = 460
+        let height: CGFloat = 580
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 320),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+            styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.title = "About Jobs Monitor"
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
         window.center()
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+
         self.init(window: window)
-        
-        setupUI()
+        setupUI(width: width, height: height)
     }
     
-    func setupUI() {
-        guard let contentView = window?.contentView else { return }
+    func setupUI(width: CGFloat, height: CGFloat) {
+        guard let window = self.window else { return }
         
-        // App Icon Image (96x96)
-        let iconView = NSImageView(frame: NSRect(x: 162, y: 205, width: 96, height: 96))
-        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        bg.material = .popover
+        bg.blendingMode = .behindWindow
+        bg.state = .active
+        
+        // App Icon (72x72)
+        let icon = NSImageView(frame: NSRect(x: (width - 72)/2, y: height - 100, width: 72, height: 72))
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png")
+            ?? Bundle.main.path(forResource: "AppIcon", ofType: "icns")
+            ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
         if let img = NSImage(contentsOfFile: iconPath) {
-            iconView.image = img
+            icon.image = img
+        } else if let img = NSImage(named: "AppIcon") {
+            icon.image = img
+        } else {
+            icon.image = NSApp.applicationIconImage
         }
-        contentView.addSubview(iconView)
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        bg.addSubview(icon)
         
-        // App Title
-        let titleLabel = NSTextField(labelWithString: "Jobs Monitor")
-        titleLabel.font = NSFont.boldSystemFont(ofSize: 18)
-        titleLabel.alignment = .center
-        titleLabel.frame = NSRect(x: 20, y: 172, width: 380, height: 24)
-        contentView.addSubview(titleLabel)
+        // Title
+        let title = NSTextField(labelWithString: "Jobs Monitor")
+        title.font = NSFont.systemFont(ofSize: 26, weight: .bold)
+        title.alignment = .center
+        title.frame = NSRect(x: 0, y: icon.frame.minY - 36, width: width, height: 32)
+        bg.addSubview(title)
         
-        // Version Subtitle
-        let verLabel = NSTextField(labelWithString: "Version \(APP_VERSION)")
-        verLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        verLabel.textColor = .secondaryLabelColor
-        verLabel.alignment = .center
-        verLabel.frame = NSRect(x: 20, y: 152, width: 380, height: 18)
-        contentView.addSubview(verLabel)
+        // Version
+        let ver = NSTextField(labelWithString: "Version \(APP_VERSION)")
+        ver.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        ver.textColor = .tertiaryLabelColor
+        ver.alignment = .center
+        ver.frame = NSRect(x: 0, y: title.frame.minY - 18, width: width, height: 16)
+        bg.addSubview(ver)
         
-        // Privacy Notice
-        let descLabel = NSTextField(wrappingLabelWithString: "Zero telemetry. The app runs 100% locally on your Mac and connects directly to jobs.apple.com to check new openings.")
-        descLabel.font = NSFont.systemFont(ofSize: 12)
-        descLabel.textColor = .secondaryLabelColor
-        descLabel.alignment = .center
-        descLabel.frame = NSRect(x: 30, y: 105, width: 360, height: 38)
-        contentView.addSubview(descLabel)
+        // Subtitle / Tagline
+        let sub = NSTextField(labelWithString: "Real-time Apple career openings tracker with smart alerts.")
+        sub.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        sub.textColor = .secondaryLabelColor
+        sub.alignment = .center
+        sub.frame = NSRect(x: 0, y: ver.frame.minY - 24, width: width, height: 18)
+        bg.addSubview(sub)
+        
+        // Features
+        let features: [(String, String, String)] = [
+            ("briefcase.fill", "Real-Time Monitoring", "Automates queries to jobs.apple.com to discover new roles instantly."),
+            ("bell.badge.fill", "Smart macOS Alerts", "Get native alert banners or sticky notifications on newly posted openings."),
+            ("slider.horizontal.3", "Role & Location Filters", "Filter by search keywords, teams, countries, and target cities."),
+            ("lock.shield.fill", "100% On-Device & Private", "Zero telemetry. Direct connection straight to jobs.apple.com.")
+        ]
+        
+        let bodyWidth = width - 80
+        var currentY = sub.frame.minY - 32
+        
+        for (sym, head, desc) in features {
+            let rowH: CGFloat = 52
+            currentY -= rowH
+            
+            let symSize: CGFloat = 24
+            let symView = NSImageView(frame: NSRect(x: 40, y: currentY + (rowH - symSize)/2 + 2, width: symSize, height: symSize))
+            let symCfg = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+            symView.image = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?.withSymbolConfiguration(symCfg)
+            symView.contentTintColor = .systemBlue
+            bg.addSubview(symView)
+            
+            let hLabel = NSTextField(labelWithString: head)
+            hLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+            hLabel.frame = NSRect(x: 80, y: currentY + 24, width: bodyWidth - 40, height: 18)
+            bg.addSubview(hLabel)
+            
+            let dLabel = NSTextField(labelWithString: desc)
+            dLabel.font = NSFont.systemFont(ofSize: 12)
+            dLabel.textColor = .secondaryLabelColor
+            dLabel.lineBreakMode = .byWordWrapping
+            dLabel.frame = NSRect(x: 80, y: currentY - 4, width: bodyWidth - 40, height: 26)
+            bg.addSubview(dLabel)
+            
+            currentY -= 6
+        }
         
         // Author Note
-        let openSourceLabel = NSTextField(labelWithString: "Free & Open Source · Built by Arun Thomas")
-        openSourceLabel.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        openSourceLabel.alignment = .center
-        openSourceLabel.frame = NSRect(x: 20, y: 82, width: 380, height: 18)
-        contentView.addSubview(openSourceLabel)
+        let credit = NSTextField(labelWithString: "Built by Arun Thomas")
+        credit.frame = NSRect(x: 0, y: currentY - 30, width: width, height: 18)
+        credit.alignment = .center
+        credit.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        credit.textColor = .secondaryLabelColor
+        bg.addSubview(credit)
         
-        // Action Buttons
-        let contactBtn = NSButton(title: "Contact Developer", target: self, action: #selector(openContact))
-        contactBtn.frame = NSRect(x: 130, y: 30, width: 160, height: 32)
-        contactBtn.bezelStyle = .rounded
-        contentView.addSubview(contactBtn)
+        // Buttons
+        let buttonsY = credit.frame.minY - 48
+        let contactW: CGFloat = 110
+        let gitW: CGFloat = 110
+        let spacing: CGFloat = 16
+        let totalW = contactW + gitW + spacing
+        let startX = (width - totalW) / 2
+        
+        let contact = NSButton(title: "Contact", target: self, action: #selector(openContact))
+        contact.frame = NSRect(x: startX, y: buttonsY, width: contactW, height: 32)
+        contact.isBordered = false
+        contact.wantsLayer = true
+        contact.layer?.backgroundColor = NSColor.white.cgColor
+        contact.layer?.cornerRadius = 16
+        contact.layer?.masksToBounds = true
+        contact.attributedTitle = NSAttributedString(string: "Contact", attributes: [
+            .foregroundColor: NSColor.black,
+            .font: NSFont.systemFont(ofSize: 13, weight: .medium)
+        ])
+        bg.addSubview(contact)
+        
+        let github = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
+        github.frame = NSRect(x: startX + contactW + spacing, y: buttonsY, width: gitW, height: 32)
+        github.isBordered = false
+        github.wantsLayer = true
+        github.layer?.backgroundColor = NSColor.black.cgColor
+        github.layer?.cornerRadius = 16
+        github.layer?.masksToBounds = true
+        github.attributedTitle = NSAttributedString(string: "GitHub", attributes: [
+            .foregroundColor: NSColor.white,
+            .font: NSFont.systemFont(ofSize: 13, weight: .medium)
+        ])
+        bg.addSubview(github)
+        
+        window.contentView = bg
     }
     
     @objc func openGitHub() {

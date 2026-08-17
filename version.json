@@ -1,7 +1,14 @@
 {
-  "version": "2.2.2",
+  "version": "2.2.3",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.2.3",
+      "date": "2026-08-17",
+      "changes": [
+        "Native Apple-Style About Window: Redesigned the About window into a sleek, full-size visual effect dialog with SF Symbol feature highlights and symmetrical pill action buttons matching Rec and ClipLocal."
+      ]
+    },
     {
       "version": "2.2.2",
       "date": "2026-08-17",
