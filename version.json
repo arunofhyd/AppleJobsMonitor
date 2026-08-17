@@ -1,7 +1,16 @@
 {
-  "version": "2.2.3",
+  "version": "2.2.4",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.2.4",
+      "date": "2026-08-17",
+      "changes": [
+        "Unified About Window Typography & Dynamic Spacing: Adopted ClipLocal-standard 24pt bold header, vibrant colored SF Symbol badges, auto-measured vertical layout, and 26px bottom padding.",
+        "Signature Diagonal Corner Shine Icon: Updated Jobs Monitor app icon and assets with top-left and bottom-right corner shine accents.",
+        "120 FPS Native Update Changelog: Upgraded update dialog with trackpad-smooth AppKit native NSTextView scrolling."
+      ]
+    },
     {
       "version": "2.2.3",
       "date": "2026-08-17",
