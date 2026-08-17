@@ -1187,13 +1187,52 @@ func normalizeJob(_ raw: [String: Any], defaultUrl: String, isInternal: Bool = f
     return JobItem(id: pid, title: title, team: teamStr, location: locStr, posted: posted, url: url, countries: extractedCountries, cities: extractedCities, isInternal: isInternal)
 }
 
+struct JobsAboutFeature {
+    let symbol: String
+    let color: NSColor
+    let title: String
+    let desc: String
+}
+
 // ── Native Modern About Window ─────────────────────────────────────────
 class AboutWindowController: NSWindowController {
     convenience init() {
-        let width: CGFloat = 440
-        let height: CGFloat = 510
+        let features: [JobsAboutFeature] = [
+            JobsAboutFeature(symbol: "briefcase.fill", color: .systemBlue, title: "Real-Time Job Monitoring", desc: "Automates queries to jobs.apple.com to catch newly opened positions instantly."),
+            JobsAboutFeature(symbol: "bell.badge.fill", color: .systemOrange, title: "Smart macOS Notifications", desc: "Get native alert banners or persistent notifications on newly discovered roles."),
+            JobsAboutFeature(symbol: "slider.horizontal.3", color: .systemPurple, title: "Role & Location Filters", desc: "Filter by search keywords, teams, target countries, and specific cities."),
+            JobsAboutFeature(symbol: "lock.shield.fill", color: .systemGreen, title: "100% On-Device & Private", desc: "Zero telemetry. Connects directly from your Mac straight to Apple careers.")
+        ]
+
+        let width: CGFloat = 460
+        let textWidth: CGFloat = width - 115
+        let para = NSMutableParagraphStyle()
+        para.lineSpacing = 2
+        let textFont = NSFont.systemFont(ofSize: 11.5, weight: .regular)
+        let titleFont = NSFont.systemFont(ofSize: 13, weight: .semibold)
+
+        var featureHeights: [CGFloat] = []
+        var totalFeaturesHeight: CGFloat = 0
+        for f in features {
+            let attr = NSAttributedString(string: f.desc, attributes: [
+                .font: textFont,
+                .paragraphStyle: para
+            ])
+            let measured = attr.boundingRect(
+                with: NSSize(width: textWidth, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading])
+            let h = ceil(measured.height) + 24
+            featureHeights.append(h)
+            totalFeaturesHeight += h + 16
+        }
+        totalFeaturesHeight -= 16
+
+        let headerHeight: CGFloat = 204
+        let bottomSpaceNeeded: CGFloat = 124
+        let finalHeight = headerHeight + totalFeaturesHeight + bottomSpaceNeeded
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+            contentRect: NSRect(x: 0, y: 0, width: width, height: finalHeight),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -1208,19 +1247,19 @@ class AboutWindowController: NSWindowController {
         window.standardWindowButton(.zoomButton)?.isHidden = true
 
         self.init(window: window)
-        setupUI(width: width, height: height)
+        setupUI(width: width, finalHeight: finalHeight, headerHeight: headerHeight, features: features, featureHeights: featureHeights, textWidth: textWidth, para: para, textFont: textFont, titleFont: titleFont)
     }
     
-    func setupUI(width: CGFloat, height: CGFloat) {
+    func setupUI(width: CGFloat, finalHeight: CGFloat, headerHeight: CGFloat, features: [JobsAboutFeature], featureHeights: [CGFloat], textWidth: CGFloat, para: NSMutableParagraphStyle, textFont: NSFont, titleFont: NSFont) {
         guard let window = self.window else { return }
         
-        let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        let bg = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: finalHeight))
         bg.material = .popover
         bg.blendingMode = .behindWindow
         bg.state = .active
         
-        // App Icon (58x58)
-        let icon = NSImageView(frame: NSRect(x: (width - 58)/2, y: 426, width: 58, height: 58))
+        // App Icon (64x64)
+        let icon = NSImageView(frame: NSRect(x: (width - 64)/2, y: finalHeight - 88, width: 64, height: 64))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png")
             ?? Bundle.main.path(forResource: "AppIcon", ofType: "icns")
             ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -1236,9 +1275,9 @@ class AboutWindowController: NSWindowController {
         
         // Title
         let title = NSTextField(labelWithString: "Jobs Monitor")
-        title.font = NSFont.systemFont(ofSize: 22, weight: .bold)
+        title.font = NSFont.systemFont(ofSize: 24, weight: .bold)
         title.alignment = .center
-        title.frame = NSRect(x: 0, y: 388, width: width, height: 26)
+        title.frame = NSRect(x: 0, y: finalHeight - 124, width: width, height: 28)
         bg.addSubview(title)
         
         // Version
@@ -1246,50 +1285,50 @@ class AboutWindowController: NSWindowController {
         ver.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
         ver.textColor = .tertiaryLabelColor
         ver.alignment = .center
-        ver.frame = NSRect(x: 0, y: 368, width: width, height: 15)
+        ver.frame = NSRect(x: 0, y: finalHeight - 144, width: width, height: 15)
         bg.addSubview(ver)
         
         // Subtitle / Tagline
         let sub = NSTextField(labelWithString: "Real-time Apple career openings tracker with smart alerts.")
-        sub.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
+        sub.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         sub.textColor = .secondaryLabelColor
         sub.alignment = .center
-        sub.frame = NSRect(x: 16, y: 346, width: width - 32, height: 16)
+        sub.frame = NSRect(x: 16, y: finalHeight - 168, width: width - 32, height: 16)
         bg.addSubview(sub)
         
         // Features
-        let features: [(String, NSColor, String, String)] = [
-            ("briefcase.fill", .systemBlue, "Real-Time Job Monitoring", "Automates checks against jobs.apple.com to catch new roles."),
-            ("bell.badge.fill", .systemOrange, "Smart macOS Notifications", "Instant native alert banners on newly published openings."),
-            ("slider.horizontal.3", .systemPurple, "Role & Location Filters", "Filter by keywords, teams, target countries, and cities."),
-            ("lock.shield.fill", .systemGreen, "100% On-Device & Private", "Zero telemetry. Direct local connection to Apple careers.")
-        ]
-        
-        let textWidth = width - 82
-        let rowYPositions: [CGFloat] = [286, 232, 178, 124]
-        
-        for (idx, item) in features.enumerated() {
-            let rowY = rowYPositions[idx]
-            let (sym, color, head, desc) = item
+        var currentY = finalHeight - headerHeight
+        for (i, f) in features.enumerated() {
+            let itemH = featureHeights[i]
+            let itemY = currentY - itemH
             
-            let symSize: CGFloat = 22
-            let symView = NSImageView(frame: NSRect(x: 28, y: rowY + 11, width: symSize, height: symSize))
-            let symCfg = NSImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
-            symView.image = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?.withSymbolConfiguration(symCfg)
-            symView.contentTintColor = color
+            let symSize: CGFloat = 24
+            let symView = NSImageView(frame: NSRect(x: 36, y: itemY + (itemH - symSize)/2 + 2, width: symSize, height: symSize))
+            let symCfg = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+            symView.image = NSImage(systemSymbolName: f.symbol, accessibilityDescription: nil)?.withSymbolConfiguration(symCfg)
+            symView.contentTintColor = f.color
             bg.addSubview(symView)
             
-            let hLabel = NSTextField(labelWithString: head)
-            hLabel.font = NSFont.systemFont(ofSize: 12.5, weight: .semibold)
-            hLabel.frame = NSRect(x: 62, y: rowY + 22, width: textWidth, height: 16)
+            let hLabel = NSTextField(labelWithString: f.title)
+            hLabel.font = titleFont
+            hLabel.frame = NSRect(x: 74, y: itemY + itemH - 20, width: textWidth, height: 18)
             bg.addSubview(hLabel)
             
-            let dLabel = NSTextField(labelWithString: desc)
-            dLabel.font = NSFont.systemFont(ofSize: 11, weight: .regular)
-            dLabel.textColor = .secondaryLabelColor
-            dLabel.lineBreakMode = .byTruncatingTail
-            dLabel.frame = NSRect(x: 62, y: rowY + 3, width: textWidth, height: 16)
+            let attr = NSAttributedString(string: f.desc, attributes: [
+                .font: textFont,
+                .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: para
+            ])
+            let dLabel = NSTextField(labelWithAttributedString: attr)
+            dLabel.frame = NSRect(x: 74, y: itemY, width: textWidth, height: itemH - 22)
+            dLabel.lineBreakMode = .byWordWrapping
+            dLabel.maximumNumberOfLines = 0
+            dLabel.isEditable = false
+            dLabel.drawsBackground = false
+            dLabel.isBordered = false
             bg.addSubview(dLabel)
+
+            currentY = itemY - 16
         }
         
         // Author Note
@@ -1309,11 +1348,11 @@ class AboutWindowController: NSWindowController {
         let startX = (width - totalW) / 2
         
         let contact = NSButton(title: "Contact", target: self, action: #selector(openContact))
-        contact.frame = NSRect(x: startX, y: buttonsY, width: contactW, height: 32)
+        contact.frame = NSRect(x: startX, y: buttonsY, width: contactW, height: 34)
         contact.isBordered = false
         contact.wantsLayer = true
         contact.layer?.backgroundColor = NSColor.white.cgColor
-        contact.layer?.cornerRadius = 16
+        contact.layer?.cornerRadius = 17
         contact.layer?.masksToBounds = true
         contact.attributedTitle = NSAttributedString(string: "Contact", attributes: [
             .foregroundColor: NSColor.black,
@@ -1322,11 +1361,11 @@ class AboutWindowController: NSWindowController {
         bg.addSubview(contact)
         
         let github = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
-        github.frame = NSRect(x: startX + contactW + spacing, y: buttonsY, width: gitW, height: 32)
+        github.frame = NSRect(x: startX + contactW + spacing, y: buttonsY, width: gitW, height: 34)
         github.isBordered = false
         github.wantsLayer = true
         github.layer?.backgroundColor = NSColor.black.cgColor
-        github.layer?.cornerRadius = 16
+        github.layer?.cornerRadius = 17
         github.layer?.masksToBounds = true
         github.attributedTitle = NSAttributedString(string: "GitHub", attributes: [
             .foregroundColor: NSColor.white,
