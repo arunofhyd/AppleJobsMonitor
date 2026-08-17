@@ -601,41 +601,32 @@ func generateDashboardHTML(
         let inInternal = internalIdSet.contains(j.id) || (j.isInternal == true)
         let inPublic = publicIdSet.contains(j.id)
         
-        let targetUrl: String
-        let badgeHtml: String
-        let btnText: String
-        let btnClass: String
+        let internalUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
+        let publicUrl = j.url.replacingOccurrences(of: "careers.apple.com", with: "jobs.apple.com")
+        let primaryUrl = inInternal ? internalUrl : publicUrl
         
+        let portalHtml: String
         if inInternal && !inPublic {
-            // Scenario 1: Exclusive to AppleConnect
-            badgeHtml = "<span class=\"badge-tag badge-internal\"> Internal Only</span>"
-            targetUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
-            btnText = "Internal ↗"
-            btnClass = "careers-btn internal-btn"
+            // Scenario 1: Exclusive to AppleConnect Internal Portal
+            portalHtml = "<a href=\"\(internalUrl)\" class=\"portal-badge portal-internal\" target=\"_blank\"> Internal ↗</a>"
         } else if inInternal && inPublic {
-            // Scenario 2: Listed on Both
-            badgeHtml = "<span class=\"badge-tag badge-internal\"> Internal</span><span class=\"badge-tag badge-public\">🌐 Public</span>"
-            targetUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
-            btnText = "Internal ↗"
-            btnClass = "careers-btn internal-btn"
+            // Scenario 2: Listed on Both Internal & Public
+            portalHtml = "<div class=\"portal-badge-group\"><a href=\"\(internalUrl)\" class=\"portal-badge portal-internal\" target=\"_blank\"> Internal ↗</a><a href=\"\(publicUrl)\" class=\"portal-badge portal-public\" target=\"_blank\">🌐 Public ↗</a></div>"
         } else {
             // Scenario 3: Public Only
-            badgeHtml = "<span class=\"badge-tag badge-public\">🌐 Public Only</span>"
-            targetUrl = j.url.replacingOccurrences(of: "careers.apple.com", with: "jobs.apple.com")
-            btnText = "Public ↗"
-            btnClass = "careers-btn public-btn"
+            portalHtml = "<a href=\"\(publicUrl)\" class=\"portal-badge portal-public\" target=\"_blank\">🌐 Public ↗</a>"
         }
         
         rows += """
         <tr data-internal="\(inInternal)" data-public="\(inPublic)" data-both="true">
           <td class="cell">
-            \(badgeHtml)<a href="\(targetUrl)" class="job-link" target="_blank">\(j.title)</a>
+            <a href="\(primaryUrl)" class="job-link" target="_blank">\(j.title)</a>
             <br><span class="text-muted">\(j.team)</span>
           </td>
           <td class="cell text-muted">\(j.posted.isEmpty ? "—" : j.posted)</td>
           <td class="cell">\(j.location)</td>
-          <td class="cell" style="text-align:right; padding-right: 8px;">
-            <a href="\(targetUrl)" class="\(btnClass)" target="_blank">\(btnText)</a>
+          <td class="cell" style="text-align:right; padding-right: 12px;">
+            \(portalHtml)
           </td>
         </tr>
         """
@@ -690,27 +681,27 @@ func generateDashboardHTML(
     if !enableInternalMode {
         footerBannerHtml = """
         <div style="padding: 20px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
-          <strong style="color: var(--text-main);">Job Links:</strong> Clicking any <strong>job title</strong> or button opens the role directly on <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
+          <strong style="color: var(--text-main);">Job Links:</strong> Clicking any <strong>job title</strong> or <span class="portal-badge portal-public" style="margin: 0 4px; pointer-events: none;">🌐 Public ↗</span> badge opens the role directly on <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
         </div>
         """
     } else if internalOnly {
         footerBannerHtml = """
         <div style="padding: 20px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
-          <strong style="color: var(--text-main);">Job Links & Portals:</strong> <span class="badge-tag badge-internal" style="margin: 0 4px;"> Internal</span> roles link directly to <a href="https://careers.apple.com" target="_blank" style="color: #af52de; font-weight: 600; text-decoration: none;">careers.apple.com ↗</a> via AppleConnect SSO.
+          <strong style="color: var(--text-main);">Job Links & Portals:</strong> Clicking any <strong>job title</strong> or <span class="portal-badge portal-internal" style="margin: 0 4px; pointer-events: none;"> Internal ↗</span> badge opens the role directly on <a href="https://careers.apple.com" target="_blank" style="color: #af52de; font-weight: 600; text-decoration: none;">careers.apple.com ↗</a> via AppleConnect SSO.
         </div>
         """
     } else {
         footerBannerHtml = """
         <div style="padding: 22px 32px; background: var(--bg-page); font-size: 13px; color: var(--text-sec); border-top: 1px solid var(--border); line-height: 1.8;">
-          <div style="font-weight: 600; color: var(--text-main); margin-bottom: 8px;">Job Links & Portals:</div>
+          <div style="font-weight: 600; color: var(--text-main); margin-bottom: 8px;">Portal Badges & Direct Links:</div>
           <div style="margin-bottom: 6px;">
-            • <span class="badge-tag badge-internal" style="margin: 0 6px 0 2px;"> Internal Only</span> Roles exclusive to Apple employees via <a href="https://careers.apple.com" target="_blank" style="color: #af52de; font-weight: 600; text-decoration: none;">careers.apple.com ↗</a> (AppleConnect SSO).
+            • <span class="portal-badge portal-internal" style="margin: 0 4px; pointer-events: none;"> Internal ↗</span> Roles available on Apple employee portal at <a href="https://careers.apple.com" target="_blank" style="color: #af52de; font-weight: 600; text-decoration: none;">careers.apple.com ↗</a> (AppleConnect SSO).
           </div>
           <div style="margin-bottom: 6px;">
-            • <span class="badge-tag badge-internal" style="margin: 0 4px 0 2px;"> Internal</span> <span class="badge-tag badge-public" style="margin: 0 6px 0 0;">🌐 Public</span> Roles listed on both internal and public portals.
+            • <span class="portal-badge portal-public" style="margin: 0 4px; pointer-events: none;">🌐 Public ↗</span> Roles open on the public jobs site at <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
           </div>
           <div>
-            • <span class="badge-tag badge-public" style="margin: 0 6px 0 2px;">🌐 Public Only</span> Roles open on the public jobs site at <a href="https://jobs.apple.com" target="_blank" style="color: var(--link); font-weight: 600; text-decoration: none;">jobs.apple.com ↗</a>.
+            • Roles displaying <strong>both</strong> badges are open across both internal employee and public applicant portals. Click either badge to visit that portal!
           </div>
         </div>
         """
@@ -870,55 +861,46 @@ func generateDashboardHTML(
       .cell { padding:16px 8px; border-bottom:1px solid var(--border); font-size:14px; }
       .job-link { color:var(--link); font-weight:600; text-decoration:none; font-size:15px; }
       .job-link:hover { text-decoration:underline; }
-      .badge-tag {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 6px;
+      .portal-badge-group {
+        display: inline-flex;
+        gap: 6px;
+        justify-content: flex-end;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .portal-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 14px;
         font-size: 11px;
         font-weight: 600;
-        margin-right: 6px;
-        vertical-align: middle;
-        position: relative;
-        top: -1px;
+        text-decoration: none;
+        transition: all 0.18s ease-in-out;
+        line-height: 1.3;
+        white-space: nowrap;
       }
-      .badge-internal {
-        background: rgba(175, 82, 222, 0.15);
-        color: #af52de;
+      .portal-internal {
+        background: rgba(175, 82, 222, 0.12);
+        color: #af52de !important;
         border: 1px solid rgba(175, 82, 222, 0.35);
       }
-      .badge-public {
-        background: rgba(0, 113, 227, 0.1);
-        color: #0071e3;
-        border: 1px solid rgba(0, 113, 227, 0.25);
-      }
-      .careers-btn {
-        display: inline-block;
-        padding: 2px 10px;
-        background: transparent;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 500;
-        text-decoration: none;
-        transition: all 0.2s;
-        line-height: 1.2;
-      }
-      .public-btn {
-        color: var(--link) !important;
-        border: 1px solid var(--link) !important;
-      }
-      .public-btn:hover {
-        background: var(--link) !important;
-        color: #ffffff !important;
-        text-decoration: none;
-      }
-      .internal-btn {
-        color: #af52de !important;
-        border: 1px solid #af52de !important;
-      }
-      .internal-btn:hover {
+      .portal-internal:hover {
         background: #af52de !important;
         color: #ffffff !important;
-        text-decoration: none;
+        border-color: #af52de !important;
+        box-shadow: 0 2px 8px rgba(175, 82, 222, 0.3);
+      }
+      .portal-public {
+        background: rgba(0, 113, 227, 0.1);
+        color: #0071e3 !important;
+        border: 1px solid rgba(0, 113, 227, 0.3);
+      }
+      .portal-public:hover {
+        background: #0071e3 !important;
+        color: #ffffff !important;
+        border-color: #0071e3 !important;
+        box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
       }
       .text-muted { color:var(--text-sec); font-size:13px; }
       .btn-wrapper { margin-top:32px; text-align:center; }
@@ -937,7 +919,7 @@ func generateDashboardHTML(
           \(filterBarHtml)
           
           <table>
-            <thead><tr><th style="width: 65%;">Role</th><th style="width: 11%;">Posted</th><th style="width: 12%;">Location</th><th style="text-align:right; width: 12%; padding-right: 18px;">PORTAL</th></tr></thead>
+            <thead><tr><th style="width: 55%;">Role</th><th style="width: 11%;">Posted</th><th style="width: 12%;">Location</th><th style="text-align:right; width: 22%; padding-right: 18px;">PORTAL</th></tr></thead>
             <tbody>
               \(rows)
               <tr id="no-match-row" style="display:none;">
