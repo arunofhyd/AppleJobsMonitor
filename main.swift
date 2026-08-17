@@ -1258,11 +1258,11 @@ class AboutWindowController: NSWindowController {
         bg.addSubview(sub)
         
         // Features
-        let features: [(String, String, String)] = [
-            ("briefcase.fill", "Real-Time Job Monitoring", "Automates checks against jobs.apple.com to catch new roles."),
-            ("bell.badge.fill", "Smart macOS Notifications", "Instant native alert banners on newly published openings."),
-            ("slider.horizontal.3", "Role & Location Filters", "Filter by keywords, teams, target countries, and cities."),
-            ("lock.shield.fill", "100% On-Device & Private", "Zero telemetry. Direct local connection to Apple careers.")
+        let features: [(String, NSColor, String, String)] = [
+            ("briefcase.fill", .systemBlue, "Real-Time Job Monitoring", "Automates checks against jobs.apple.com to catch new roles."),
+            ("bell.badge.fill", .systemOrange, "Smart macOS Notifications", "Instant native alert banners on newly published openings."),
+            ("slider.horizontal.3", .systemPurple, "Role & Location Filters", "Filter by keywords, teams, target countries, and cities."),
+            ("lock.shield.fill", .systemGreen, "100% On-Device & Private", "Zero telemetry. Direct local connection to Apple careers.")
         ]
         
         let textWidth = width - 82
@@ -1270,13 +1270,13 @@ class AboutWindowController: NSWindowController {
         
         for (idx, item) in features.enumerated() {
             let rowY = rowYPositions[idx]
-            let (sym, head, desc) = item
+            let (sym, color, head, desc) = item
             
             let symSize: CGFloat = 22
             let symView = NSImageView(frame: NSRect(x: 28, y: rowY + 11, width: symSize, height: symSize))
             let symCfg = NSImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
             symView.image = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?.withSymbolConfiguration(symCfg)
-            symView.contentTintColor = .white
+            symView.contentTintColor = color
             bg.addSubview(symView)
             
             let hLabel = NSTextField(labelWithString: head)
