@@ -6,7 +6,9 @@
       "version": "2.2.0",
       "date": "2026-08-17",
       "changes": [
-        "Interactive 3-Pill Filter: Segmented tabs for Both / All,  Internal (top 40), and 🌐 Public (top 40) roles with independent 40-role quotas.",
+        "Apple Employee Internal Mode (careers.apple.com): Added full support for internal AppleConnect SSO authentication via a secure embedded sheet, enabling seamless tracking of unlisted internal job postings.",
+        "Dual-Channel Job Aggregation: Automatically queries and merges both public (jobs.apple.com) and internal (careers.apple.com) portals with independent top-40 quotas per channel.",
+        "Interactive 3-Pill Filter: Segmented tabs for Both / All,  Internal (top 40), and 🌐 Public (top 40) roles.",
         "Live Instant Search: Real-time search filter directly on the dashboard to quickly filter roles by title, department, or city.",
         "3-Tier Badges & Action Buttons: Clean distinction between  Internal Only,  Internal + 🌐 Public, and 🌐 Public Only roles with dedicated Internal ↗ and Public ↗ portal buttons.",
         "Mode-Adaptive Dashboard: Automatically hides internal filter controls when Internal Mode is disabled for public job seekers.",
