@@ -535,6 +535,7 @@ struct StateData: Codable {
     var last_check_timestamp: Double?
     var isAppleConnectAuthenticated: Bool?
     var ssoSessionExpired: Bool?
+    var hasEverAuthenticatedInternal: Bool?
 }
 
 func loadStateData() -> StateData {
@@ -1342,6 +1343,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
                     self?.statusLabel.textColor = .systemGreen
                     var state = loadStateData()
                     state.isAppleConnectAuthenticated = true
+                    state.hasEverAuthenticatedInternal = true
                     state.ssoSessionExpired = false
                     saveStateData(state)
                     self?.onAuthCompletion?(true)
@@ -1375,6 +1377,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         store.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast) {
             var state = loadStateData()
             state.isAppleConnectAuthenticated = false
+            state.hasEverAuthenticatedInternal = false
             state.ssoSessionExpired = false
             saveStateData(state)
             DispatchQueue.main.async {
@@ -2056,6 +2059,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
                 
                 var st = loadStateData()
                 st.isAppleConnectAuthenticated = false
+                st.hasEverAuthenticatedInternal = false
                 st.ssoSessionExpired = false
                 saveStateData(st)
                 
@@ -2349,12 +2353,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         menu.addItem(prefItem)
         
         let settings = loadSettings()
-        let isAuth = state.isAppleConnectAuthenticated ?? false
-        if settings.enableInternalMode && isAuth {
-            let isExpired = (state.ssoSessionExpired == true)
-            let modeTitle = isExpired ? "⚠️ AppleConnect Session Expired" : "Internal Mode: Active "
-            let modeItem = NSMenuItem(title: modeTitle, action: #selector(openPreferences), keyEquivalent: "")
-            modeItem.image = NSImage(systemSymbolName: isExpired ? "exclamationmark.triangle.fill" : "apple.logo", accessibilityDescription: nil)
+        let hasEverAuthed = state.hasEverAuthenticatedInternal ?? false
+        let isExpired = (state.ssoSessionExpired == true)
+        
+        // Only show "Session Expired" if the user was previously authenticated and is using Internal Mode
+        if settings.enableInternalMode && hasEverAuthed && isExpired {
+            let modeItem = NSMenuItem(title: "⚠️ AppleConnect Session Expired", action: #selector(openPreferences), keyEquivalent: "")
+            modeItem.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)
             modeItem.target = self
             menu.addItem(modeItem)
         }
