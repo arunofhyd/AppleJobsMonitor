@@ -2174,10 +2174,16 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
     func updateInternalAuthUI() {
         let state = loadStateData()
         let isAuth = state.isAppleConnectAuthenticated ?? false
+        let isExpired = (state.ssoSessionExpired == true)
         
         if isAuth {
-            internalAuthStatusLabel.stringValue = "● Authenticated with AppleConnect"
-            internalAuthStatusLabel.textColor = .systemGreen
+            if isExpired {
+                internalAuthStatusLabel.stringValue = "⚠️ Authentication Session Expired"
+                internalAuthStatusLabel.textColor = .systemOrange
+            } else {
+                internalAuthStatusLabel.stringValue = "● Authenticated with AppleConnect"
+                internalAuthStatusLabel.textColor = .systemGreen
+            }
             signInAppleConnectBtn.title = "Re-authenticate..."
             disconnectAppleConnectBtn.isHidden = false
             enableInternalModeCheckbox.isEnabled = true
