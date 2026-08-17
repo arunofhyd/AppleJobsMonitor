@@ -24,10 +24,13 @@ Built specifically for engineers, designers, and professionals tracking roles ac
 
 ## 🎯 Features
 
-*   **100% Local & Privacy-First**: 🔒 Zero tracking, zero telemetry. Connects directly from your Mac to `jobs.apple.com`.
-*   **Global & City Search Support**: 🌍 Track openings across **20+ countries** and **24 major tech hubs** (Cupertino, Austin, SF, Seattle, London, Hyderabad, Bengaluru, Singapore, Munich, etc.) or set a custom Apple Jobs search URL.
+*   ** Apple Employee Internal Mode**: 🔐 Integrated AppleConnect SSO authentication via a secure embedded sheet to track internal-only positions on `careers.apple.com`.
+*   **Dual-Channel Aggregation & 3-Pill Filter**: 📊 Seamlessly browse `Both / All`, ` Internal (top 40)`, and `🌐 Public (top 40)` roles with independent 40-position quotas.
+*   **Live Instant Search**: 🔍 Filter roles in real-time by title, department/team, or city location directly on your interactive HTML dashboard.
+*   **3-Tier Badges & Action Links**: 🏷️ Clearly distinguish ` Internal Only`, ` Internal + 🌐 Public`, and `🌐 Public Only` postings with dedicated `Internal ↗` and `Public ↗` application buttons.
+*   **100% Local & Privacy-First**: 🔒 Zero tracking, zero telemetry. Connects directly from your Mac to Apple portals.
+*   **Global & City Search Support**: 🌍 Track openings across **20+ countries** and **24 major tech hubs** (Cupertino, Austin, SF, Seattle, London, Hyderabad, Bengaluru, Singapore, Munich, etc.) or set a custom search URL.
 *   **Instant macOS Alerts**: 🔔 Get instant, non-intrusive macOS system alerts whenever new matching roles are posted.
-*   **Interactive Web Dashboard**: 📊 Click "View Dashboard" to open a clean HTML dashboard showing role title, team, location, and direct application links.
 *   **Custom Check Intervals**: ⏱️ Set background check intervals from **5 minutes to 6 hours**.
 *   **Daily Digest Schedule**: 🗓️ Schedule daily summaries at your preferred time (e.g. 10:00 AM) on active weekdays (Mon–Fri).
 *   **Adaptive Menu Bar Icon**:  Features a custom monochrome vector menu bar icon (Apple logo inside a magnifying glass) that dynamically adapts to macOS Light & Dark Modes.

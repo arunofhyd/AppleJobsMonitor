@@ -8,11 +8,13 @@
       "changes": [
         "Apple Employee Internal Mode (careers.apple.com): Added full support for internal AppleConnect SSO authentication via a secure embedded sheet, enabling seamless tracking of unlisted internal job postings.",
         "Dual-Channel Job Aggregation: Automatically queries and merges both public (jobs.apple.com) and internal (careers.apple.com) portals with independent top-40 quotas per channel.",
-        "Interactive 3-Pill Filter: Segmented tabs for Both / All,  Internal (top 40), and 🌐 Public (top 40) roles.",
+        "Internal-Only Tracking Preference: Added option in Preferences to monitor exclusively internal employee requisitions.",
+        "Interactive 3-Pill Filter: Segmented tabs for Both / All,  Internal (top 40), and 🌐 Public (top 40) roles with dynamic count badges.",
         "Live Instant Search: Real-time search filter directly on the dashboard to quickly filter roles by title, department, or city.",
         "3-Tier Badges & Action Buttons: Clean distinction between  Internal Only,  Internal + 🌐 Public, and 🌐 Public Only roles with dedicated Internal ↗ and Public ↗ portal buttons.",
         "Mode-Adaptive Dashboard: Automatically hides internal filter controls when Internal Mode is disabled for public job seekers.",
         "AppleConnect SSO Session Health: Actively monitors SSO cookie validity and provides quick re-authentication in the menu bar if expired.",
+        "Expanded 40-Role Capacity: Increased tracked role capacity from 30 up to 40+ independent active roles.",
         "Preference Revert on Close: Unsaved checkbox changes in Preferences are discarded if closed or cancelled."
       ]
     },
