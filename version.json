@@ -1,7 +1,16 @@
 {
-  "version": "2.2.1",
+  "version": "2.2.2",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.2.2",
+      "date": "2026-08-17",
+      "changes": [
+        "Internal Careers Portal Route Fix: Resolved 404 page-not-found error in AppleConnect sign-in sheet by routing directly to active careers search URL.",
+        "Manual 'Confirm Sign In' Action: Added dedicated Confirm Sign In button to authentication window for instant session validation.",
+        "Active Internal Mode Indicator: Restored 'Internal Mode: Active ' in the menu bar for active internal sessions while keeping menu bloat-free for public users."
+      ]
+    },
     {
       "version": "2.2.1",
       "date": "2026-08-17",
