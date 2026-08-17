@@ -2374,13 +2374,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         menu.addItem(prefItem)
         
         let settings = loadSettings()
-        let hasEverAuthed = state.hasEverAuthenticatedInternal ?? false
+        let isAuth = (state.isAppleConnectAuthenticated ?? false) || (state.hasEverAuthenticatedInternal ?? false)
         let isExpired = (state.ssoSessionExpired == true)
         
-        // Only show "Session Expired" if the user was previously authenticated and is using Internal Mode
-        if settings.enableInternalMode && hasEverAuthed && isExpired {
-            let modeItem = NSMenuItem(title: "⚠️ AppleConnect Session Expired", action: #selector(openPreferences), keyEquivalent: "")
-            modeItem.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)
+        if settings.enableInternalMode && isAuth {
+            let modeTitle = isExpired ? "⚠️ AppleConnect Session Expired" : "Internal Mode: Active "
+            let modeItem = NSMenuItem(title: modeTitle, action: #selector(openPreferences), keyEquivalent: "")
+            modeItem.image = NSImage(systemSymbolName: isExpired ? "exclamationmark.triangle.fill" : "apple.logo", accessibilityDescription: nil)
             modeItem.target = self
             menu.addItem(modeItem)
         }
