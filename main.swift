@@ -1191,7 +1191,7 @@ func normalizeJob(_ raw: [String: Any], defaultUrl: String, isInternal: Bool = f
 class AboutWindowController: NSWindowController {
     convenience init() {
         let width: CGFloat = 460
-        let height: CGFloat = 580
+        let height: CGFloat = 600
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
             styleMask: [.titled, .closable, .fullSizeContentView],
@@ -1219,8 +1219,8 @@ class AboutWindowController: NSWindowController {
         bg.blendingMode = .behindWindow
         bg.state = .active
         
-        // App Icon (72x72)
-        let icon = NSImageView(frame: NSRect(x: (width - 72)/2, y: height - 100, width: 72, height: 72))
+        // App Icon (68x68)
+        let icon = NSImageView(frame: NSRect(x: (width - 68)/2, y: height - 96, width: 68, height: 68))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png")
             ?? Bundle.main.path(forResource: "AppIcon", ofType: "icns")
             ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -1238,7 +1238,7 @@ class AboutWindowController: NSWindowController {
         let title = NSTextField(labelWithString: "Jobs Monitor")
         title.font = NSFont.systemFont(ofSize: 26, weight: .bold)
         title.alignment = .center
-        title.frame = NSRect(x: 0, y: icon.frame.minY - 36, width: width, height: 32)
+        title.frame = NSRect(x: 0, y: icon.frame.minY - 34, width: width, height: 30)
         bg.addSubview(title)
         
         // Version
@@ -1251,29 +1251,29 @@ class AboutWindowController: NSWindowController {
         
         // Subtitle / Tagline
         let sub = NSTextField(labelWithString: "Real-time Apple career openings tracker with smart alerts.")
-        sub.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        sub.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
         sub.textColor = .secondaryLabelColor
         sub.alignment = .center
-        sub.frame = NSRect(x: 0, y: ver.frame.minY - 24, width: width, height: 18)
+        sub.frame = NSRect(x: 20, y: ver.frame.minY - 22, width: width - 40, height: 18)
         bg.addSubview(sub)
         
         // Features
         let features: [(String, String, String)] = [
-            ("briefcase.fill", "Real-Time Monitoring", "Automates queries to jobs.apple.com to discover new roles instantly."),
-            ("bell.badge.fill", "Smart macOS Alerts", "Get native alert banners or sticky notifications on newly posted openings."),
+            ("briefcase.fill", "Real-Time Job Monitoring", "Automates checks against jobs.apple.com to discover new roles instantly."),
+            ("bell.badge.fill", "Smart macOS Notifications", "Get native alert banners or sticky notifications on newly posted openings."),
             ("slider.horizontal.3", "Role & Location Filters", "Filter by search keywords, teams, countries, and target cities."),
-            ("lock.shield.fill", "100% On-Device & Private", "Zero telemetry. Direct connection straight to jobs.apple.com.")
+            ("lock.shield.fill", "100% On-Device & Private", "Zero telemetry. Connects directly from your Mac straight to Apple careers.")
         ]
         
-        let bodyWidth = width - 80
-        var currentY = sub.frame.minY - 32
+        let textWidth = width - 115 // 345px wide
+        var currentY = sub.frame.minY - 26
         
         for (sym, head, desc) in features {
-            let rowH: CGFloat = 52
+            let rowH: CGFloat = 56
             currentY -= rowH
             
             let symSize: CGFloat = 24
-            let symView = NSImageView(frame: NSRect(x: 40, y: currentY + (rowH - symSize)/2 + 2, width: symSize, height: symSize))
+            let symView = NSImageView(frame: NSRect(x: 36, y: currentY + (rowH - symSize)/2 + 2, width: symSize, height: symSize))
             let symCfg = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
             symView.image = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?.withSymbolConfiguration(symCfg)
             symView.contentTintColor = .systemBlue
@@ -1281,14 +1281,15 @@ class AboutWindowController: NSWindowController {
             
             let hLabel = NSTextField(labelWithString: head)
             hLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-            hLabel.frame = NSRect(x: 80, y: currentY + 24, width: bodyWidth - 40, height: 18)
+            hLabel.frame = NSRect(x: 74, y: currentY + 28, width: textWidth, height: 18)
             bg.addSubview(hLabel)
             
             let dLabel = NSTextField(labelWithString: desc)
-            dLabel.font = NSFont.systemFont(ofSize: 12)
+            dLabel.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
             dLabel.textColor = .secondaryLabelColor
             dLabel.lineBreakMode = .byWordWrapping
-            dLabel.frame = NSRect(x: 80, y: currentY - 4, width: bodyWidth - 40, height: 26)
+            dLabel.maximumNumberOfLines = 2
+            dLabel.frame = NSRect(x: 74, y: currentY - 4, width: textWidth, height: 32)
             bg.addSubview(dLabel)
             
             currentY -= 6
@@ -1296,14 +1297,14 @@ class AboutWindowController: NSWindowController {
         
         // Author Note
         let credit = NSTextField(labelWithString: "Built by Arun Thomas")
-        credit.frame = NSRect(x: 0, y: currentY - 30, width: width, height: 18)
+        credit.frame = NSRect(x: 0, y: currentY - 28, width: width, height: 18)
         credit.alignment = .center
         credit.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
         credit.textColor = .secondaryLabelColor
         bg.addSubview(credit)
         
         // Buttons
-        let buttonsY = credit.frame.minY - 48
+        let buttonsY = credit.frame.minY - 46
         let contactW: CGFloat = 110
         let gitW: CGFloat = 110
         let spacing: CGFloat = 16
