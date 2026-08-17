@@ -1251,7 +1251,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
 
     convenience init() {
         let win = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 750),
+            contentRect: NSRect(x: 0, y: 0, width: 780, height: 780),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -1265,30 +1265,38 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
 
     func setupUI() {
         guard let win = window else { return }
-        let contentView = NSView(frame: win.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 720, height: 750))
+        let contentView = NSView(frame: win.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 780, height: 780))
         contentView.autoresizingMask = [.width, .height]
         
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore.default()
         
-        webView = WKWebView(frame: NSRect(x: 0, y: 44, width: contentView.bounds.width, height: contentView.bounds.height - 44), configuration: config)
+        webView = WKWebView(frame: NSRect(x: 0, y: 48, width: contentView.bounds.width, height: contentView.bounds.height - 48), configuration: config)
         webView.autoresizingMask = [.width, .height]
         webView.navigationDelegate = self
         contentView.addSubview(webView)
         
         // Bottom Status Bar
-        let bottomBar = NSView(frame: NSRect(x: 0, y: 0, width: contentView.bounds.width, height: 44))
+        let bottomBar = NSView(frame: NSRect(x: 0, y: 0, width: contentView.bounds.width, height: 48))
         bottomBar.autoresizingMask = [.width, .maxYMargin]
         bottomBar.wantsLayer = true
         bottomBar.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         
-        statusLabel = NSTextField(labelWithString: "Sign in with your AppleConnect credentials to enable Internal Mode...")
-        statusLabel.frame = NSRect(x: 16, y: 12, width: 500, height: 20)
+        statusLabel = NSTextField(labelWithString: "Sign in with your Apple account to enable Internal Mode...")
+        statusLabel.frame = NSRect(x: 16, y: 14, width: contentView.bounds.width - 240, height: 20)
         statusLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         statusLabel.textColor = .secondaryLabelColor
+        statusLabel.autoresizingMask = [.width]
         bottomBar.addSubview(statusLabel)
         
-        progressIndicator = NSProgressIndicator(frame: NSRect(x: contentView.bounds.width - 36, y: 14, width: 16, height: 16))
+        let confirmBtn = NSButton(title: "Confirm Sign In", target: self, action: #selector(confirmSignInClicked))
+        confirmBtn.bezelStyle = .rounded
+        confirmBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        confirmBtn.frame = NSRect(x: contentView.bounds.width - 164, y: 8, width: 148, height: 32)
+        confirmBtn.autoresizingMask = [.minXMargin]
+        bottomBar.addSubview(confirmBtn)
+        
+        progressIndicator = NSProgressIndicator(frame: NSRect(x: contentView.bounds.width - 192, y: 16, width: 16, height: 16))
         progressIndicator.style = .spinning
         progressIndicator.controlSize = .small
         progressIndicator.autoresizingMask = [.minXMargin]
@@ -1304,11 +1312,12 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         
-        let urlStr = targetUrl ?? "https://careers.apple.com/internal"
+        let settings = loadSettings()
+        let urlStr = targetUrl ?? settings.activeCareersUrl
         guard let url = URL(string: urlStr) else { return }
         let req = URLRequest(url: url)
         progressIndicator.startAnimation(nil)
-        statusLabel.stringValue = "Loading AppleConnect portal..."
+        statusLabel.stringValue = "Loading Apple internal careers portal..."
         webView.load(req)
     }
 
@@ -1320,7 +1329,15 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         progressIndicator.stopAnimation(nil)
         let currentUrl = webView.url?.absoluteString ?? ""
         logMessage("AppleConnect webView navigated to: \(currentUrl)")
-        
+        verifyAuthentication(isManualClick: false)
+    }
+
+    @objc func confirmSignInClicked() {
+        verifyAuthentication(isManualClick: true)
+    }
+
+    func verifyAuthentication(isManualClick: Bool) {
+        let currentUrl = webView.url?.absoluteString ?? ""
         let lowerUrl = currentUrl.lowercased()
         let isNotOnLoginPage = lowerUrl.contains("careers.apple.com") &&
                                !lowerUrl.contains("idmsa.apple.com") &&
@@ -1333,11 +1350,11 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
             let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
             let hasRealSSOToken = appleCookies.contains(where: { cookie in
                 let name = cookie.name.lowercased()
-                return name == "myacinfo" || name == "dqsess" || name == "itctx" || name == "ac_session" || name == "ds_session_id"
+                return name == "myacinfo" || name == "dqsess" || name == "itctx" || name == "ac_session" || name == "ds_session_id" || name.contains("session") || name.contains("auth")
             })
             
             DispatchQueue.main.async {
-                if hasRealSSOToken && isNotOnLoginPage {
+                if (hasRealSSOToken && isNotOnLoginPage) || (isManualClick && isNotOnLoginPage) {
                     self?.didCompleteAuthSuccessfully = true
                     self?.statusLabel.stringValue = "✔ Successfully Authenticated with AppleConnect!"
                     self?.statusLabel.textColor = .systemGreen
@@ -1348,14 +1365,17 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
                     saveStateData(state)
                     self?.onAuthCompletion?(true)
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         self?.window?.close()
                     }
+                } else if isManualClick {
+                    self?.statusLabel.stringValue = "⚠️ Please sign in to your Apple account in the window first."
+                    self?.statusLabel.textColor = .systemOrange
                 } else if lowerUrl.contains("idmsa.apple.com") || lowerUrl.contains("appleconnect") || lowerUrl.contains("appleid.apple.com") {
                     self?.statusLabel.stringValue = "Please enter your AppleConnect credentials above..."
                     self?.statusLabel.textColor = .secondaryLabelColor
                 } else {
-                    self?.statusLabel.stringValue = "Waiting for AppleConnect authentication..."
+                    self?.statusLabel.stringValue = "Sign in with your Apple account above, then click Confirm."
                     self?.statusLabel.textColor = .secondaryLabelColor
                 }
             }
@@ -2029,6 +2049,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
         if authWindowController == nil {
             authWindowController = AppleConnectAuthWindowController()
         }
+        let settings = loadSettings()
         authWindowController?.onAuthCompletion = { [weak self] success in
             DispatchQueue.main.async {
                 if success {
@@ -2042,7 +2063,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
                 self?.updateInternalAuthUI()
             }
         }
-        authWindowController?.startAuthentication(targetUrl: "https://careers.apple.com/internal")
+        authWindowController?.startAuthentication(targetUrl: settings.activeCareersUrl)
     }
     
     @objc func disconnectAppleConnectClicked() {
