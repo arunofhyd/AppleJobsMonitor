@@ -1241,11 +1241,12 @@ class AboutWindowController: NSWindowController {
 }
 
 // ── AppleConnect SSO WebKit Authentication Window ──────────────────────────────
-class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate {
+class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate, NSWindowDelegate {
     var webView: WKWebView!
     var statusLabel: NSTextField!
     var progressIndicator: NSProgressIndicator!
     var onAuthCompletion: ((Bool) -> Void)?
+    private var didCompleteAuthSuccessfully = false
 
     convenience init() {
         let win = NSWindow(
@@ -1257,6 +1258,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         win.title = "AppleConnect Sign In · Jobs Monitor"
         win.center()
         self.init(window: win)
+        win.delegate = self
         setupUI()
     }
 
@@ -1297,10 +1299,11 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
     }
 
     func startAuthentication(targetUrl: String? = nil) {
+        didCompleteAuthSuccessfully = false
         showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         
-        let urlStr = targetUrl ?? "https://careers.apple.com/en-us/search"
+        let urlStr = targetUrl ?? "https://careers.apple.com/internal"
         guard let url = URL(string: urlStr) else { return }
         let req = URLRequest(url: url)
         progressIndicator.startAnimation(nil)
@@ -1317,33 +1320,52 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         let currentUrl = webView.url?.absoluteString ?? ""
         logMessage("AppleConnect webView navigated to: \(currentUrl)")
         
-        // Check if user reached careers.apple.com authenticated search/home without being on idmsa.apple.com
-        if currentUrl.contains("careers.apple.com") && !currentUrl.contains("idmsa.apple.com") && !currentUrl.contains("appleconnect") {
-            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
-                let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
-                let hasAuthCookies = appleCookies.contains(where: {
-                    let name = $0.name.lowercased()
-                    return name.contains("myacinfo") || name.contains("dqsess") || name.contains("itctx") || name.contains("session") || name.contains("auth")
-                }) || !appleCookies.isEmpty
-                
-                if hasAuthCookies {
-                    DispatchQueue.main.async {
-                        self?.statusLabel.stringValue = "✔ Successfully Authenticated with AppleConnect!"
-                        self?.statusLabel.textColor = .systemGreen
-                        var state = loadStateData()
-                        state.isAppleConnectAuthenticated = true
-                        saveStateData(state)
-                        self?.onAuthCompletion?(true)
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                            self?.window?.close()
-                        }
+        let lowerUrl = currentUrl.lowercased()
+        let isNotOnLoginPage = lowerUrl.contains("careers.apple.com") &&
+                               !lowerUrl.contains("idmsa.apple.com") &&
+                               !lowerUrl.contains("appleconnect") &&
+                               !lowerUrl.contains("appleid.apple.com") &&
+                               !lowerUrl.contains("signin") &&
+                               !lowerUrl.contains("auth")
+        
+        WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
+            let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
+            let hasRealSSOToken = appleCookies.contains(where: { cookie in
+                let name = cookie.name.lowercased()
+                return name == "myacinfo" || name == "dqsess" || name == "itctx" || name == "ac_session" || name == "ds_session_id"
+            })
+            
+            DispatchQueue.main.async {
+                if hasRealSSOToken && isNotOnLoginPage {
+                    self?.didCompleteAuthSuccessfully = true
+                    self?.statusLabel.stringValue = "✔ Successfully Authenticated with AppleConnect!"
+                    self?.statusLabel.textColor = .systemGreen
+                    var state = loadStateData()
+                    state.isAppleConnectAuthenticated = true
+                    state.ssoSessionExpired = false
+                    saveStateData(state)
+                    self?.onAuthCompletion?(true)
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                        self?.window?.close()
                     }
+                } else if lowerUrl.contains("idmsa.apple.com") || lowerUrl.contains("appleconnect") || lowerUrl.contains("appleid.apple.com") {
+                    self?.statusLabel.stringValue = "Please enter your AppleConnect credentials above..."
+                    self?.statusLabel.textColor = .secondaryLabelColor
+                } else {
+                    self?.statusLabel.stringValue = "Waiting for AppleConnect authentication..."
+                    self?.statusLabel.textColor = .secondaryLabelColor
                 }
             }
-        } else {
-            statusLabel.stringValue = "Please complete AppleConnect verification in the window above..."
-            statusLabel.textColor = .secondaryLabelColor
+        }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        if !didCompleteAuthSuccessfully {
+            let state = loadStateData()
+            if state.isAppleConnectAuthenticated != true {
+                onAuthCompletion?(false)
+            }
         }
     }
 
@@ -1353,6 +1375,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         store.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast) {
             var state = loadStateData()
             state.isAppleConnectAuthenticated = false
+            state.ssoSessionExpired = false
             saveStateData(state)
             DispatchQueue.main.async {
                 completion()
@@ -1948,18 +1971,36 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
     }
     
     @objc func internalModeToggled() {
-        let isEnabled = enableInternalModeCheckbox.state == .on
-        internalOnlyCheckbox.isEnabled = isEnabled
-        signInAppleConnectBtn.isEnabled = isEnabled
-        disconnectAppleConnectBtn.isEnabled = isEnabled
+        let state = loadStateData()
+        let isAuth = state.isAppleConnectAuthenticated ?? false
+        
+        if enableInternalModeCheckbox.state == .on {
+            if !isAuth {
+                // Cannot enable without authentication
+                enableInternalModeCheckbox.state = .off
+                internalOnlyCheckbox.state = .off
+                internalOnlyCheckbox.isEnabled = false
+                
+                let alert = NSAlert()
+                alert.messageText = "AppleConnect Authentication Required"
+                alert.informativeText = "To enable Internal Mode, please sign in with your Apple employee credentials."
+                alert.alertStyle = .informational
+                alert.addButton(withTitle: "Sign In with AppleConnect...")
+                alert.addButton(withTitle: "Cancel")
+                
+                if alert.runModal() == .alertFirstButtonReturn {
+                    signInAppleConnectClicked()
+                }
+                return
+            }
+            internalOnlyCheckbox.isEnabled = true
+        } else {
+            internalOnlyCheckbox.state = .off
+            internalOnlyCheckbox.isEnabled = false
+        }
     }
     
     func updateInternalAuthUI() {
-        let isEnabled = enableInternalModeCheckbox.state == .on
-        internalOnlyCheckbox.isEnabled = isEnabled
-        signInAppleConnectBtn.isEnabled = isEnabled
-        disconnectAppleConnectBtn.isEnabled = isEnabled
-        
         let state = loadStateData()
         let isAuth = state.isAppleConnectAuthenticated ?? false
         
@@ -1968,11 +2009,16 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
             internalAuthStatusLabel.textColor = .systemGreen
             signInAppleConnectBtn.title = "Re-authenticate..."
             disconnectAppleConnectBtn.isHidden = false
+            enableInternalModeCheckbox.isEnabled = true
+            internalOnlyCheckbox.isEnabled = (enableInternalModeCheckbox.state == .on)
         } else {
             internalAuthStatusLabel.stringValue = "○ Not Signed In"
             internalAuthStatusLabel.textColor = .secondaryLabelColor
             signInAppleConnectBtn.title = "Sign In with AppleConnect..."
             disconnectAppleConnectBtn.isHidden = true
+            enableInternalModeCheckbox.state = .off
+            internalOnlyCheckbox.state = .off
+            internalOnlyCheckbox.isEnabled = false
         }
     }
     
@@ -1980,16 +2026,41 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
         if authWindowController == nil {
             authWindowController = AppleConnectAuthWindowController()
         }
-        let settings = loadSettings()
-        authWindowController?.onAuthCompletion = { [weak self] _ in
-            self?.updateInternalAuthUI()
+        authWindowController?.onAuthCompletion = { [weak self] success in
+            DispatchQueue.main.async {
+                if success {
+                    self?.enableInternalModeCheckbox.state = .on
+                    self?.internalOnlyCheckbox.isEnabled = true
+                } else {
+                    self?.enableInternalModeCheckbox.state = .off
+                    self?.internalOnlyCheckbox.state = .off
+                    self?.internalOnlyCheckbox.isEnabled = false
+                }
+                self?.updateInternalAuthUI()
+            }
         }
-        authWindowController?.startAuthentication(targetUrl: settings.activeCareersUrl)
+        authWindowController?.startAuthentication(targetUrl: "https://careers.apple.com/internal")
     }
     
     @objc func disconnectAppleConnectClicked() {
         AppleConnectAuthWindowController.clearSession { [weak self] in
-            self?.updateInternalAuthUI()
+            DispatchQueue.main.async {
+                self?.enableInternalModeCheckbox.state = .off
+                self?.internalOnlyCheckbox.state = .off
+                self?.internalOnlyCheckbox.isEnabled = false
+                
+                var s = loadSettings()
+                s.enableInternalMode = false
+                s.internalOnly = false
+                saveSettings(s)
+                
+                var st = loadStateData()
+                st.isAppleConnectAuthenticated = false
+                st.ssoSessionExpired = false
+                saveStateData(st)
+                
+                self?.updateInternalAuthUI()
+            }
         }
     }
     
@@ -2119,8 +2190,15 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
         s.dailyCheckMinute = selectedTimeOpt.minute
         s.activeDays = dayButtons.map { $0.state == .on }
         
-        s.enableInternalMode = (enableInternalModeCheckbox.state == .on)
-        s.internalOnly = (internalOnlyCheckbox.state == .on)
+        let state = loadStateData()
+        let isAuth = state.isAppleConnectAuthenticated ?? false
+        if enableInternalModeCheckbox.state == .on && isAuth {
+            s.enableInternalMode = true
+            s.internalOnly = (internalOnlyCheckbox.state == .on)
+        } else {
+            s.enableInternalMode = false
+            s.internalOnly = false
+        }
         
         let launchLogin = (launchAtLoginCheckbox.state == .on)
         s.launchAtLogin = launchLogin
@@ -2271,11 +2349,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         menu.addItem(prefItem)
         
         let settings = loadSettings()
-        if settings.enableInternalMode {
-            let isAuth = (state.isAppleConnectAuthenticated ?? false) && (state.ssoSessionExpired != true)
-            let modeTitle = isAuth ? "Internal Mode: Active " : "⚠️ AppleConnect Session Expired"
+        let isAuth = state.isAppleConnectAuthenticated ?? false
+        if settings.enableInternalMode && isAuth {
+            let isExpired = (state.ssoSessionExpired == true)
+            let modeTitle = isExpired ? "⚠️ AppleConnect Session Expired" : "Internal Mode: Active "
             let modeItem = NSMenuItem(title: modeTitle, action: #selector(openPreferences), keyEquivalent: "")
-            modeItem.image = NSImage(systemSymbolName: isAuth ? "apple.logo" : "exclamationmark.triangle.fill", accessibilityDescription: nil)
+            modeItem.image = NSImage(systemSymbolName: isExpired ? "exclamationmark.triangle.fill" : "apple.logo", accessibilityDescription: nil)
             modeItem.target = self
             menu.addItem(modeItem)
         }
@@ -2643,7 +2722,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     
     func performCheck(isManual: Bool) {
         let settings = loadSettings()
-        logMessage("Fetching roles for \(settings.locationTitle) (Internal Mode: \(settings.enableInternalMode ? "ON" : "OFF"))...")
+        let state = loadStateData()
+        let isAuth = (state.isAppleConnectAuthenticated == true)
+        let internalModeActive = settings.enableInternalMode && isAuth
+        
+        logMessage("Fetching roles for \(settings.locationTitle) (Internal Mode: \(internalModeActive ? "ON" : "OFF"))...")
         
         let publicBaseUrl = settings.activeUrl
         let internalBaseUrl = settings.activeCareersUrl
@@ -2685,7 +2768,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                     
                     if isInternalChannel && pageJobs.isEmpty {
                         let lowerHtml = html.lowercased()
-                        if lowerHtml.contains("sign in with your apple account") || lowerHtml.contains("appleid.apple.com/auth/authorize") || lowerHtml.contains("login.apple.com") {
+                        if lowerHtml.contains("sign in with your apple account") || lowerHtml.contains("appleid.apple.com/auth/authorize") || lowerHtml.contains("login.apple.com") || lowerHtml.contains("appleconnect") {
                             lock.lock()
                             ssoExpiredDetected = true
                             lock.unlock()
@@ -2703,7 +2786,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             }
         }
         
-        if settings.enableInternalMode {
+        if internalModeActive {
             WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
                 let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
                 
@@ -2713,19 +2796,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 fetchChannel(baseUrlStr: internalBaseUrl, isInternalChannel: true, cookies: appleCookies)
                 
                 group.notify(queue: .main) {
-                    self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, ssoExpiredDetected: ssoExpiredDetected, settings: settings, isManual: isManual)
+                    self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, ssoExpiredDetected: ssoExpiredDetected, internalModeActive: true, settings: settings, isManual: isManual)
                 }
             }
         } else {
             fetchChannel(baseUrlStr: publicBaseUrl, isInternalChannel: false)
             
             group.notify(queue: .main) { [weak self] in
-                self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, ssoExpiredDetected: false, settings: settings, isManual: isManual)
+                self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: [], ssoExpiredDetected: false, internalModeActive: false, settings: settings, isManual: isManual)
             }
         }
     }
     
-    func processFetchedJobs(publicJobs: [JobItem], internalJobs: [JobItem], ssoExpiredDetected: Bool, settings: AppSettings, isManual: Bool) {
+    func processFetchedJobs(publicJobs: [JobItem], internalJobs: [JobItem], ssoExpiredDetected: Bool, internalModeActive: Bool, settings: AppSettings, isManual: Bool) {
         // 1. Deduplicate & sort public jobs
         var publicMap: [String: JobItem] = [:]
         var publicOrder: [String] = []
@@ -2785,14 +2868,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             return j1.id > j2.id
         }
         
-        if settings.enableInternalMode && settings.internalOnly {
+        if internalModeActive && settings.internalOnly {
             displayJobs = top40Internal
-        } else if !settings.enableInternalMode {
+        } else if !internalModeActive {
             displayJobs = top40Public
         }
         
         let totalUniqueRoles = displayJobs.count
-        if settings.enableInternalMode {
+        if internalModeActive {
             logMessage("Fetched \(totalUniqueRoles) total active roles (\(top40Internal.count) top internal, \(top40Public.count) top public) for \(settings.locationTitle)")
         } else {
             logMessage("Fetched \(displayJobs.count) total roles for \(settings.locationTitle)")
@@ -2812,14 +2895,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         state.last_job_count = displayJobs.count
         state.last_check_timestamp = now.timeIntervalSince1970
         
-        if settings.enableInternalMode {
-            if ssoExpiredDetected || (internalJobs.isEmpty && (state.isAppleConnectAuthenticated == true)) {
+        if internalModeActive {
+            if ssoExpiredDetected || internalJobs.isEmpty {
                 state.ssoSessionExpired = true
                 logMessage("⚠️ AppleConnect SSO session appears expired. Re-authentication needed.")
-            } else if !internalJobs.isEmpty {
+            } else {
                 state.ssoSessionExpired = false
                 state.isAppleConnectAuthenticated = true
             }
+        } else {
+            state.ssoSessionExpired = false
+            state.isAppleConnectAuthenticated = false
         }
         
         let currentUnread = (state.unread_count ?? 0) + newJobs.count
@@ -2830,20 +2916,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         updateBadge(unreadCount: currentUnread)
         rebuildMenu()
         
+        let effectiveInternalMode = internalModeActive && (state.ssoSessionExpired != true)
         let firstName = getUserFirstName()
-        let modeSubtitle = settings.enableInternalMode ? (settings.internalOnly ? " [Internal Only]" : " [Public + Internal]") : ""
-        let greeting = settings.enableInternalMode && !settings.internalOnly
+        let modeSubtitle = effectiveInternalMode ? (settings.internalOnly ? " [Internal Only]" : " [Public + Internal]") : ""
+        let greeting = effectiveInternalMode && !settings.internalOnly
             ? "Hi \(firstName) 👋 — \(top40Internal.count) Internal & \(top40Public.count) Public active roles tracked for <strong>\(settings.locationTitle)</strong>:"
             : "Hi \(firstName) 👋 — \(min(40, displayJobs.count)) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>\(modeSubtitle):"
             
-        let searchDisplayUrl = settings.enableInternalMode ? settings.activeCareersUrl : settings.activeUrl
+        let searchDisplayUrl = effectiveInternalMode ? settings.activeCareersUrl : settings.activeUrl
         let htmlStr = generateDashboardHTML(jobs: displayJobs,
                                              internalIdSet: internalIdSet,
                                              publicIdSet: publicIdSet,
                                              internalTotalCount: top40Internal.count,
                                              publicTotalCount: top40Public.count,
-                                             enableInternalMode: settings.enableInternalMode,
-                                             internalOnly: settings.internalOnly,
+                                             enableInternalMode: effectiveInternalMode,
+                                             internalOnly: settings.internalOnly && effectiveInternalMode,
                                              greeting: greeting,
                                              locationTitle: "\(settings.locationTitle)\(modeSubtitle)",
                                              searchUrl: searchDisplayUrl)
