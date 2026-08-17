@@ -1027,11 +1027,11 @@ func generateDashboardHTML(
           
           var status = document.getElementById('filter-status');
           if (status) {
-            var label = (activeFilter === 'all') ? 'roles' : ((activeFilter === 'internal') ? ' internal roles' : '🌐 public roles');
+            var label = (activeFilter === 'all') ? 'roles' : ((activeFilter === 'internal') ? ' internal roles' : groupIconHtml + ' public roles');
             if (query.length > 0) {
-              status.textContent = 'Found ' + visibleCount + ' ' + label + ' matching "' + query + '"';
+              status.innerHTML = 'Found ' + visibleCount + ' ' + label + ' matching "' + query + '"';
             } else {
-              status.textContent = 'Showing all ' + visibleCount + ' ' + label;
+              status.innerHTML = 'Showing all ' + visibleCount + ' ' + label;
             }
           }
         }
