@@ -1,7 +1,16 @@
 {
-  "version": "2.2.0",
+  "version": "2.2.1",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.2.1",
+      "date": "2026-08-17",
+      "changes": [
+        "Strict SSO Token Verification: Enforced authentic AppleConnect session tokens (myacinfo) before enabling Internal Mode, eliminating false authenticated states on public devices.",
+        "Gated Internal Preferences: Locked the 'Enable Internal Mode' toggle so it automatically reverts to OFF if AppleConnect sign-in is unauthenticated or cancelled.",
+        "False Alert Prevention: Completely suppressed 'Session Expired' menu warnings when running in public-only mode."
+      ]
+    },
     {
       "version": "2.2.0",
       "date": "2026-08-17",
