@@ -1,7 +1,17 @@
 {
-  "version": "2.2.5",
+  "version": "2.2.6",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.2.6",
+      "date": "2026-08-17",
+      "changes": [
+        "Decluttered Dashboard Table: Relocated tags from the role title column into dedicated interactive portal action badges in the PORTAL column.",
+        "Apple-Style Group Vector Icon: Replaced generic globe emoji with a sleek vector group filled icon for public roles, filter pills, and action badges.",
+        "Dynamic Portal Action Routing: Bottom action button dynamically hints and routes to  Internal Jobs (careers.apple.com) or 👥 Public Jobs (jobs.apple.com) based on the active filter tab.",
+        "Minimalist Filter Navigation: Renamed Both / All tab to All for a cleaner segment bar."
+      ]
+    },
     {
       "version": "2.2.5",
       "date": "2026-08-17",
