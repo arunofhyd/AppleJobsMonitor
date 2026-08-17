@@ -666,7 +666,7 @@ func generateDashboardHTML(
         filterBarHtml = """
         <div class="filter-bar">
           <div class="filter-group">
-            <button class="filter-pill active" onclick="setFilter('all', this)">Both / All <span class="pill-count">\(totalCount)</span></button>
+            <button class="filter-pill active" onclick="setFilter('all', this)">All <span class="pill-count">\(totalCount)</span></button>
             <button class="filter-pill" onclick="setFilter('internal', this)"> Internal <span class="pill-count">\(internalTotalCount)</span></button>
             <button class="filter-pill" onclick="setFilter('public', this)">\(groupFilledIconSvg)Public <span class="pill-count">\(publicTotalCount)</span></button>
           </div>
