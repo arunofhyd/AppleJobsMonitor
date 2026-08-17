@@ -1190,8 +1190,8 @@ func normalizeJob(_ raw: [String: Any], defaultUrl: String, isInternal: Bool = f
 // ── Native Modern About Window ─────────────────────────────────────────
 class AboutWindowController: NSWindowController {
     convenience init() {
-        let width: CGFloat = 460
-        let height: CGFloat = 620
+        let width: CGFloat = 440
+        let height: CGFloat = 510
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
             styleMask: [.titled, .closable, .fullSizeContentView],
@@ -1219,8 +1219,8 @@ class AboutWindowController: NSWindowController {
         bg.blendingMode = .behindWindow
         bg.state = .active
         
-        // App Icon (68x68)
-        let icon = NSImageView(frame: NSRect(x: (width - 68)/2, y: 516, width: 68, height: 68))
+        // App Icon (58x58)
+        let icon = NSImageView(frame: NSRect(x: (width - 58)/2, y: 426, width: 58, height: 58))
         let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png")
             ?? Bundle.main.path(forResource: "AppIcon", ofType: "icns")
             ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
@@ -1236,102 +1236,101 @@ class AboutWindowController: NSWindowController {
         
         // Title
         let title = NSTextField(labelWithString: "Jobs Monitor")
-        title.font = NSFont.systemFont(ofSize: 26, weight: .bold)
+        title.font = NSFont.systemFont(ofSize: 22, weight: .bold)
         title.alignment = .center
-        title.frame = NSRect(x: 0, y: 476, width: width, height: 30)
+        title.frame = NSRect(x: 0, y: 388, width: width, height: 26)
         bg.addSubview(title)
         
         // Version
         let ver = NSTextField(labelWithString: "Version \(APP_VERSION)")
-        ver.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        ver.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
         ver.textColor = .tertiaryLabelColor
         ver.alignment = .center
-        ver.frame = NSRect(x: 0, y: 454, width: width, height: 16)
+        ver.frame = NSRect(x: 0, y: 368, width: width, height: 15)
         bg.addSubview(ver)
         
         // Subtitle / Tagline
         let sub = NSTextField(labelWithString: "Real-time Apple career openings tracker with smart alerts.")
-        sub.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
+        sub.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
         sub.textColor = .secondaryLabelColor
         sub.alignment = .center
-        sub.frame = NSRect(x: 20, y: 430, width: width - 40, height: 18)
+        sub.frame = NSRect(x: 16, y: 346, width: width - 32, height: 16)
         bg.addSubview(sub)
         
         // Features
         let features: [(String, String, String)] = [
-            ("briefcase.fill", "Real-Time Job Monitoring", "Automates checks against jobs.apple.com to discover new roles instantly."),
-            ("bell.badge.fill", "Smart macOS Notifications", "Get native alert banners or sticky notifications on newly posted openings."),
-            ("slider.horizontal.3", "Role & Location Filters", "Filter by search keywords, teams, countries, and target cities."),
-            ("lock.shield.fill", "100% On-Device & Private", "Zero telemetry. Connects directly from your Mac straight to Apple careers.")
+            ("briefcase.fill", "Real-Time Job Monitoring", "Automates checks against jobs.apple.com to catch new roles."),
+            ("bell.badge.fill", "Smart macOS Notifications", "Instant native alert banners on newly published openings."),
+            ("slider.horizontal.3", "Role & Location Filters", "Filter by keywords, teams, target countries, and cities."),
+            ("lock.shield.fill", "100% On-Device & Private", "Zero telemetry. Direct local connection to Apple careers.")
         ]
         
-        let textWidth = width - 115 // 345px wide
-        let rowYPositions: [CGFloat] = [356, 294, 232, 170]
+        let textWidth = width - 82
+        let rowYPositions: [CGFloat] = [286, 232, 178, 124]
         
         for (idx, item) in features.enumerated() {
             let rowY = rowYPositions[idx]
             let (sym, head, desc) = item
             
-            let symSize: CGFloat = 24
-            let symView = NSImageView(frame: NSRect(x: 36, y: rowY + 16, width: symSize, height: symSize))
-            let symCfg = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+            let symSize: CGFloat = 22
+            let symView = NSImageView(frame: NSRect(x: 28, y: rowY + 11, width: symSize, height: symSize))
+            let symCfg = NSImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
             symView.image = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?.withSymbolConfiguration(symCfg)
-            symView.contentTintColor = .systemBlue
+            symView.contentTintColor = .white
             bg.addSubview(symView)
             
             let hLabel = NSTextField(labelWithString: head)
-            hLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-            hLabel.frame = NSRect(x: 74, y: rowY + 28, width: textWidth, height: 18)
+            hLabel.font = NSFont.systemFont(ofSize: 12.5, weight: .semibold)
+            hLabel.frame = NSRect(x: 62, y: rowY + 22, width: textWidth, height: 16)
             bg.addSubview(hLabel)
             
             let dLabel = NSTextField(labelWithString: desc)
-            dLabel.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
+            dLabel.font = NSFont.systemFont(ofSize: 11, weight: .regular)
             dLabel.textColor = .secondaryLabelColor
-            dLabel.lineBreakMode = .byWordWrapping
-            dLabel.maximumNumberOfLines = 2
-            dLabel.frame = NSRect(x: 74, y: rowY, width: textWidth, height: 26)
+            dLabel.lineBreakMode = .byTruncatingTail
+            dLabel.frame = NSRect(x: 62, y: rowY + 3, width: textWidth, height: 16)
             bg.addSubview(dLabel)
         }
         
-        // Author Note (Spacious 36px gap from features)
+        // Author Note
         let credit = NSTextField(labelWithString: "Built by Arun Thomas")
-        credit.frame = NSRect(x: 0, y: 116, width: width, height: 18)
+        credit.frame = NSRect(x: 0, y: 78, width: width, height: 16)
         credit.alignment = .center
-        credit.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        credit.font = NSFont.systemFont(ofSize: 11.5, weight: .semibold)
         credit.textColor = .secondaryLabelColor
         bg.addSubview(credit)
         
-        // Action Buttons (Spacious 38px gap from credit, 44px bottom clearance)
-        let buttonsY: CGFloat = 44
-        let contactW: CGFloat = 115
-        let gitW: CGFloat = 115
-        let spacing: CGFloat = 16
+        // Action Buttons
+        let buttonsY: CGFloat = 26
+        let contactW: CGFloat = 110
+        let gitW: CGFloat = 110
+        let spacing: CGFloat = 14
         let totalW = contactW + gitW + spacing
         let startX = (width - totalW) / 2
         
         let contact = NSButton(title: "Contact", target: self, action: #selector(openContact))
-        contact.frame = NSRect(x: startX, y: buttonsY, width: contactW, height: 34)
+        contact.frame = NSRect(x: startX, y: buttonsY, width: contactW, height: 32)
         contact.isBordered = false
         contact.wantsLayer = true
         contact.layer?.backgroundColor = NSColor.white.cgColor
-        contact.layer?.cornerRadius = 17
+        contact.layer?.cornerRadius = 16
         contact.layer?.masksToBounds = true
         contact.attributedTitle = NSAttributedString(string: "Contact", attributes: [
             .foregroundColor: NSColor.black,
-            .font: NSFont.systemFont(ofSize: 13, weight: .medium)
+            .font: NSFont.systemFont(ofSize: 12.5, weight: .medium)
         ])
         bg.addSubview(contact)
         
         let github = NSButton(title: "GitHub", target: self, action: #selector(openGitHub))
-        github.frame = NSRect(x: startX + contactW + spacing, y: buttonsY, width: gitW, height: 34)
+        github.frame = NSRect(x: startX + contactW + spacing, y: buttonsY, width: gitW, height: 32)
         github.isBordered = false
         github.wantsLayer = true
         github.layer?.backgroundColor = NSColor.black.cgColor
-        github.layer?.cornerRadius = 17
+        github.layer?.cornerRadius = 16
         github.layer?.masksToBounds = true
         github.attributedTitle = NSAttributedString(string: "GitHub", attributes: [
             .foregroundColor: NSColor.white,
-            .font: NSFont.systemFont(ofSize: 13, weight: .medium)
+            .font: NSFont.systemFont(ofSize: 12.5, weight: .medium)
         ])
         bg.addSubview(github)
         
