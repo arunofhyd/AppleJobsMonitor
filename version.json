@@ -1,7 +1,17 @@
 {
-  "version": "2.2.6",
+  "version": "2.3.0",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.3.0",
+      "date": "2026-08-18",
+      "changes": [
+        "Public Job Title Link Fix: Direct job title clicks in Public view now reliably route to jobs.apple.com instead of careers.apple.com.",
+        "Automatic Experience Level Detection: Classifies positions into Intern, Early (1–3 yrs), Mid (4–7 yrs), Advanced (7+ yrs), and Director based on job requirements and role seniority.",
+        "Muted Experience Badges: Displays detected experience levels cleanly beside the team category (e.g. Software and Services • Advanced).",
+        "Experience Filter Pills: Added one-click segment filters for All, Intern, Early, Mid, Advanced, and Director levels with real-time role counts."
+      ]
+    },
     {
       "version": "2.2.6",
       "date": "2026-08-17",

@@ -6,7 +6,7 @@ import UserNotifications
 import WebKit
 
 // ── Global Single-Source Constants ─────────────────────────────────────────────
-let APP_VERSION = "2.2.6"
+let APP_VERSION = "2.3.0"
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
 let VERSION_CHECK_URL = "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/version.json"
@@ -546,6 +546,96 @@ struct JobItem: Codable {
     var countries: [String]? = []
     var cities: [String]? = []
     var isInternal: Bool? = false
+    var summary: String? = ""
+    var expLevel: String? = ""
+}
+
+// ── Experience Level Detector ──────────────────────────────────────────────────
+func detectExperienceLevel(title: String, summary: String) -> String? {
+    let fullText = "\(title)\n\(summary)".lowercased()
+    let titleLower = title.lowercased()
+    
+    // 1. Director check
+    let directorPatterns = [
+        "\\bdirector\\b", "\\bsr\\.?\\s*director\\b", "\\bsenior director\\b",
+        "\\bexecutive director\\b", "\\bmanaging director\\b", "\\bvice president\\b",
+        "\\bvp\\b", "\\bhead of\\b"
+    ]
+    for p in directorPatterns {
+        if titleLower.range(of: p, options: .regularExpression) != nil {
+            return "Director"
+        }
+    }
+    if fullText.range(of: "\\b(director of|senior director)\\b", options: .regularExpression) != nil {
+        return "Director"
+    }
+    
+    // 2. Intern check
+    let internPatterns = [
+        "\\bintern\\b", "\\binternship\\b", "\\bco-op\\b", "\\bcoop\\b",
+        "\\bstudent worker\\b", "\\bapprentice\\b", "\\bapprenticeship\\b",
+        "\\bgraduate intern\\b", "\\btrainee\\b"
+    ]
+    for p in internPatterns {
+        if titleLower.range(of: p, options: .regularExpression) != nil || fullText.range(of: p, options: .regularExpression) != nil {
+            return "Intern"
+        }
+    }
+    
+    // 3. Explicit Year Ranges in Summary / Title
+    var extractedYears: [Int] = []
+    let yearPatterns = [
+        "(\\d{1,2})\\s*(?:\\+|plus|\\-\\s*\\d{1,2}|\\s*to\\s*\\d{1,2})?\\s*(?:years?|yrs?)(?:\\s+of)?\\s+(?:experience|relevant|industry|professional|working|hands-on|practical)",
+        "(?:minimum|at least|more than|over|requires?|with)\\s+(\\d{1,2})\\s*(?:\\+\\s*)?(?:years?|yrs?)",
+        "(\\d{1,2})\\s*\\+\\s*(?:years?|yrs?)",
+        "(\\d{1,2})\\s*\\-\\s*(\\d{1,2})\\s*(?:years?|yrs?)",
+        "(\\d{1,2})\\s*to\\s*(\\d{1,2})\\s*(?:years?|yrs?)"
+    ]
+    
+    for pattern in yearPatterns {
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+            let nsText = fullText as NSString
+            let matches = regex.matches(in: fullText, options: [], range: NSRange(location: 0, length: nsText.length))
+            for match in matches {
+                for i in 1..<match.numberOfRanges {
+                    let r = match.range(at: i)
+                    if r.location != NSNotFound, let num = Int(nsText.substring(with: r)), num >= 1 && num <= 35 {
+                        extractedYears.append(num)
+                    }
+                }
+            }
+        }
+    }
+    
+    if let maxYears = extractedYears.max() {
+        if maxYears >= 7 {
+            return "Advanced"
+        } else if maxYears >= 4 {
+            return "Mid"
+        } else if maxYears >= 1 {
+            return "Early"
+        }
+    }
+    
+    // 4. Early career title indicators
+    if titleLower.contains("junior") || titleLower.contains("associate") || titleLower.contains("entry level") || titleLower.contains("entry-level") || titleLower.contains("new grad") || titleLower.contains("jr.") || titleLower.contains("jr ") || titleLower.contains("early career") || titleLower.contains("early careers") {
+        return "Early"
+    }
+    if fullText.contains("early career") || fullText.contains("early careers") || fullText.contains("new graduate") || fullText.contains("entry level") {
+        return "Early"
+    }
+    
+    // 5. Senior / Lead / Manager / Staff title indicators
+    if titleLower.contains("principal") || titleLower.contains("staff") || titleLower.contains("senior") || titleLower.contains("lead") || titleLower.contains("architect") || titleLower.contains("manager") || titleLower.contains("store leader") || titleLower.contains("sr.") || titleLower.contains("sr ") || titleLower.contains("distinguished") {
+        return "Advanced"
+    }
+    
+    // 6. Standard professional roles defaulting to Mid
+    if titleLower.contains("engineer") || titleLower.contains("specialist") || titleLower.contains("expert") || titleLower.contains("consultant") || titleLower.contains("developer") || titleLower.contains("designer") || titleLower.contains("analyst") || titleLower.contains("planner") || titleLower.contains("pro") || titleLower.contains("genius") || titleLower.contains("creative") {
+        return "Mid"
+    }
+    
+    return nil
 }
 
 struct StateData: Codable {
@@ -597,6 +687,12 @@ func generateDashboardHTML(
 ) -> String {
     let totalCount = jobs.count
     
+    let countIntern = jobs.filter { $0.expLevel == "Intern" }.count
+    let countEarly = jobs.filter { $0.expLevel == "Early" }.count
+    let countMid = jobs.filter { $0.expLevel == "Mid" }.count
+    let countAdvanced = jobs.filter { $0.expLevel == "Advanced" }.count
+    let countDirector = jobs.filter { $0.expLevel == "Director" }.count
+    
     var rows = ""
     for j in jobs {
         let inInternal = internalIdSet.contains(j.id) || (j.isInternal == true)
@@ -604,7 +700,8 @@ func generateDashboardHTML(
         
         let internalUrl = j.url.replacingOccurrences(of: "jobs.apple.com", with: "careers.apple.com")
         let publicUrl = j.url.replacingOccurrences(of: "careers.apple.com", with: "jobs.apple.com")
-        let primaryUrl = inInternal ? internalUrl : publicUrl
+        // Direct title link: Always routes to public jobs site unless role is strictly internal-only
+        let primaryUrl = (inPublic || !inInternal) ? publicUrl : internalUrl
         
         let groupFilledIconSvg = "<svg class=\"portal-icon\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7Zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216ZM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z\"/></svg>"
         
@@ -620,11 +717,14 @@ func generateDashboardHTML(
             portalHtml = "<a href=\"\(publicUrl)\" class=\"portal-badge portal-public\" target=\"_blank\">\(groupFilledIconSvg)Public ↗</a>"
         }
         
+        let expSuffix = (j.expLevel != nil && !j.expLevel!.isEmpty) ? " • \(j.expLevel!)" : ""
+        let levelAttr = j.expLevel?.lowercased() ?? ""
+        
         rows += """
-        <tr data-internal="\(inInternal)" data-public="\(inPublic)" data-both="true">
+        <tr data-internal="\(inInternal)" data-public="\(inPublic)" data-level="\(levelAttr)" data-public-url="\(publicUrl)" data-internal-url="\(internalUrl)" data-both="true">
           <td class="cell">
             <a href="\(primaryUrl)" class="job-link" target="_blank">\(j.title)</a>
-            <br><span class="text-muted">\(j.team)</span>
+            <br><span class="text-muted">\(j.team)\(expSuffix)</span>
           </td>
           <td class="cell text-muted">\(j.posted.isEmpty ? "—" : j.posted)</td>
           <td class="cell">\(j.location)</td>
@@ -636,39 +736,62 @@ func generateDashboardHTML(
     }
     
     let nowStr = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .short)
-    
     let groupFilledIconSvg = "<svg class=\"portal-icon\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7Zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216ZM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z\"/></svg>"
+    
+    let levelFilterPills = """
+    <div class="filter-group">
+      <button class="filter-pill level-pill active" onclick="setLevelFilter('all', this)">All <span class="pill-count">\(totalCount)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('intern', this)">Intern <span class="pill-count">\(countIntern)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('early', this)">Early <span class="pill-count">\(countEarly)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('mid', this)">Mid <span class="pill-count">\(countMid)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('advanced', this)">Advanced <span class="pill-count">\(countAdvanced)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('director', this)">Director <span class="pill-count">\(countDirector)</span></button>
+    </div>
+    """
     
     var filterBarHtml = ""
     if !enableInternalMode {
         filterBarHtml = """
         <div class="filter-bar">
+          <div class="filters-left">
+            \(levelFilterPills)
+          </div>
           <div class="search-box-wrapper">
             <span class="search-icon">🔍</span>
             <input type="text" id="job-search" class="search-input" placeholder="Search roles, teams, locations..." oninput="filterDashboard()" autocomplete="off" spellcheck="false">
             <button class="clear-search-btn" id="clear-search" onclick="clearSearch()" style="display:none;">✕</button>
           </div>
-          <div class="filter-status" id="filter-status">Showing all \(totalCount) public roles</div>
+        </div>
+        <div class="filter-status-row">
+          <span class="filter-status" id="filter-status">Showing all \(totalCount) public roles</span>
         </div>
         """
     } else if internalOnly {
         filterBarHtml = """
         <div class="filter-bar">
+          <div class="filters-left">
+            \(levelFilterPills)
+          </div>
           <div class="search-box-wrapper">
             <span class="search-icon">🔍</span>
             <input type="text" id="job-search" class="search-input" placeholder="Search \(totalCount) internal roles..." oninput="filterDashboard()" autocomplete="off" spellcheck="false">
             <button class="clear-search-btn" id="clear-search" onclick="clearSearch()" style="display:none;">✕</button>
           </div>
-          <div class="filter-status" id="filter-status">Showing all \(totalCount)  internal roles</div>
+        </div>
+        <div class="filter-status-row">
+          <span class="filter-status" id="filter-status">Showing all \(totalCount)  internal roles</span>
         </div>
         """
     } else {
         filterBarHtml = """
         <div class="filter-bar">
-          <div class="filter-group">
-            <button class="filter-pill active" onclick="setFilter('all', this)">All <span class="pill-count">\(totalCount)</span></button>
-            <button class="filter-pill" onclick="setFilter('internal', this)"> Internal <span class="pill-count">\(internalTotalCount)</span></button>
-            <button class="filter-pill" onclick="setFilter('public', this)">\(groupFilledIconSvg)Public <span class="pill-count">\(publicTotalCount)</span></button>
+          <div class="filters-left">
+            <div class="filter-group">
+              <button class="filter-pill portal-pill active" onclick="setPortalFilter('all', this)">All Portals <span class="pill-count">\(totalCount)</span></button>
+              <button class="filter-pill portal-pill" onclick="setPortalFilter('internal', this)"> Internal <span class="pill-count">\(internalTotalCount)</span></button>
+              <button class="filter-pill portal-pill" onclick="setPortalFilter('public', this)">\(groupFilledIconSvg)Public <span class="pill-count">\(publicTotalCount)</span></button>
+            </div>
+            \(levelFilterPills)
           </div>
           <div class="search-box-wrapper">
             <span class="search-icon">🔍</span>
@@ -758,6 +881,12 @@ func generateDashboardHTML(
         flex-wrap: wrap;
         gap: 12px;
       }
+      .filters-left {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
       .filter-group {
         display: inline-flex;
         background: var(--bg-page);
@@ -765,6 +894,7 @@ func generateDashboardHTML(
         border-radius: 30px;
         border: 1px solid var(--border);
         gap: 4px;
+        flex-wrap: wrap;
       }
       .filter-pill {
         background: transparent;
@@ -953,19 +1083,20 @@ func generateDashboardHTML(
       </div>
       
       <script>
-        var activeFilter = 'all';
+        var activePortalFilter = 'all';
+        var activeLevelFilter = 'all';
         var publicSearchUrl = "\(publicSearchUrl)";
         var careersSearchUrl = "\(careersSearchUrl)";
         var groupIconHtml = '<svg class="portal-icon" style="vertical-align:-1.5px; width:13px; height:13px; margin:0 3px;" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7Zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216ZM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg>';
         
-        function setFilter(type, btn) {
-          document.querySelectorAll('.filter-pill').forEach(function(el) { el.classList.remove('active'); });
+        function setPortalFilter(type, btn) {
+          document.querySelectorAll('.portal-pill').forEach(function(el) { el.classList.remove('active'); });
           if (btn) btn.classList.add('active');
-          activeFilter = type;
+          activePortalFilter = type;
           
           var viewAllBtn = document.getElementById('view-all-jobs-btn');
           if (viewAllBtn) {
-            if (activeFilter === 'internal') {
+            if (activePortalFilter === 'internal') {
               viewAllBtn.href = careersSearchUrl;
               viewAllBtn.innerHTML = 'View All  Internal Jobs →';
             } else {
@@ -974,6 +1105,27 @@ func generateDashboardHTML(
             }
           }
           
+          // Dynamic direct job link routing: In internal filter, use internalUrl; otherwise use publicUrl if available
+          document.querySelectorAll('tbody tr[data-both]').forEach(function(row) {
+            var link = row.querySelector('.job-link');
+            if (link) {
+              if (activePortalFilter === 'internal' && row.getAttribute('data-internal') === 'true') {
+                link.href = row.getAttribute('data-internal-url');
+              } else {
+                var pUrl = row.getAttribute('data-public-url');
+                var inPub = row.getAttribute('data-public') === 'true';
+                link.href = (inPub && pUrl) ? pUrl : (row.getAttribute('data-internal-url') || pUrl);
+              }
+            }
+          });
+          
+          filterDashboard();
+        }
+        
+        function setLevelFilter(level, btn) {
+          document.querySelectorAll('.level-pill').forEach(function(el) { el.classList.remove('active'); });
+          if (btn) btn.classList.add('active');
+          activeLevelFilter = level.toLowerCase();
           filterDashboard();
         }
         
@@ -1000,19 +1152,27 @@ func generateDashboardHTML(
           var visibleCount = 0;
           
           rows.forEach(function(row) {
-            var matchType = false;
-            if (activeFilter === 'all') {
-              matchType = true;
-            } else if (activeFilter === 'internal') {
-              matchType = (row.getAttribute('data-internal') === 'true');
-            } else if (activeFilter === 'public') {
-              matchType = (row.getAttribute('data-public') === 'true');
+            var matchPortal = false;
+            if (activePortalFilter === 'all') {
+              matchPortal = true;
+            } else if (activePortalFilter === 'internal') {
+              matchPortal = (row.getAttribute('data-internal') === 'true');
+            } else if (activePortalFilter === 'public') {
+              matchPortal = (row.getAttribute('data-public') === 'true');
+            }
+            
+            var rowLevel = (row.getAttribute('data-level') || '').toLowerCase();
+            var matchLevel = false;
+            if (activeLevelFilter === 'all') {
+              matchLevel = true;
+            } else {
+              matchLevel = (rowLevel === activeLevelFilter);
             }
             
             var text = row.textContent.toLowerCase();
             var matchQuery = (query === '' || text.indexOf(query) !== -1);
             
-            if (matchType && matchQuery) {
+            if (matchPortal && matchLevel && matchQuery) {
               row.style.display = '';
               visibleCount++;
             } else {
@@ -1027,11 +1187,13 @@ func generateDashboardHTML(
           
           var status = document.getElementById('filter-status');
           if (status) {
-            var label = (activeFilter === 'all') ? 'roles' : ((activeFilter === 'internal') ? ' internal roles' : groupIconHtml + ' public roles');
+            var portalLabel = (activePortalFilter === 'all') ? 'roles' : ((activePortalFilter === 'internal') ? ' internal roles' : groupIconHtml + ' public roles');
+            var levelLabel = (activeLevelFilter === 'all') ? '' : (' ' + activeLevelFilter.charAt(0).toUpperCase() + activeLevelFilter.slice(1));
+            var combinedLabel = levelLabel.length > 0 ? (levelLabel + ' ' + portalLabel) : portalLabel;
             if (query.length > 0) {
-              status.innerHTML = 'Found ' + visibleCount + ' ' + label + ' matching "' + query + '"';
+              status.innerHTML = 'Found ' + visibleCount + ' ' + combinedLabel + ' matching "' + query + '"';
             } else {
-              status.innerHTML = 'Showing all ' + visibleCount + ' ' + label;
+              status.innerHTML = 'Showing all ' + visibleCount + ' ' + combinedLabel;
             }
           }
         }
@@ -1192,8 +1354,10 @@ func normalizeJob(_ raw: [String: Any], defaultUrl: String, isInternal: Bool = f
     
     let posted = (raw["postingDate"] as? String) ?? (raw["datePosted"] as? String) ?? ""
     let url = isInternal ? "https://careers.apple.com/en-us/details/\(pid)" : "https://jobs.apple.com/en-us/details/\(pid)"
+    let summary = (raw["jobSummary"] as? String) ?? (raw["description"] as? String) ?? ""
+    let expLevel = detectExperienceLevel(title: title, summary: summary) ?? ""
     
-    return JobItem(id: pid, title: title, team: teamStr, location: locStr, posted: posted, url: url, countries: extractedCountries, cities: extractedCities, isInternal: isInternal)
+    return JobItem(id: pid, title: title, team: teamStr, location: locStr, posted: posted, url: url, countries: extractedCountries, cities: extractedCities, isInternal: isInternal, summary: summary, expLevel: expLevel)
 }
 
 struct JobsAboutFeature {
