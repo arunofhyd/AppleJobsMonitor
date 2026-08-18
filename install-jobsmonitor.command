@@ -12,6 +12,8 @@ APP_NAME="JobsMonitor"
 PLIST_LABEL="com.aoh.jobsmonitor"
 MAIN_SWIFT_URL="https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/main.swift"
 LOGO_PNG_URL="https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/logo-jobsmonitor.png"
+APP_ICON_ICNS_URL="https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/AppIcon.icns"
+APP_ICON_PNG_URL="https://raw.githubusercontent.com/arunofhyd/JobsMonitor/main/AppIcon.png"
 
 # Terminal Colors & Formatting
 BLUE='\033[0;34m'
@@ -64,6 +66,8 @@ else
         fail "Could not fetch main.swift from GitHub. Please check your internet connection."
         exit 1
     fi
+    curl -sSL "$APP_ICON_ICNS_URL" -o "$BUILD_DIR/AppIcon.icns" 2>/dev/null || true
+    curl -sSL "$APP_ICON_PNG_URL" -o "$BUILD_DIR/AppIcon.png" 2>/dev/null || true
     curl -sSL "$LOGO_PNG_URL" -o "$BUILD_DIR/logo-jobsmonitor.png" 2>/dev/null || true
 fi
 
@@ -117,6 +121,9 @@ chmod 755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 [ -f "$BUILD_DIR/AppIcon.icns" ] && cp "$BUILD_DIR/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 [ -f "$BUILD_DIR/AppIcon.png" ] && cp "$BUILD_DIR/AppIcon.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
 [ -f "$BUILD_DIR/logo-jobsmonitor.png" ] && cp "$BUILD_DIR/logo-jobsmonitor.png" "$APP_BUNDLE/Contents/Resources/logo-jobsmonitor.png"
+if [ ! -f "$APP_BUNDLE/Contents/Resources/AppIcon.png" ] && [ -f "$BUILD_DIR/logo-jobsmonitor.png" ]; then
+    cp "$BUILD_DIR/logo-jobsmonitor.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
+fi
 
 cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -313,7 +320,21 @@ bg.addSubview(sub)
 let iconSize: CGFloat = 128, midY: CGFloat = 145
 let appIcon = DragIcon(frame: NSRect(x: 90, y: midY, width: iconSize, height: iconSize))
 appIcon.imageScaling = .scaleProportionallyUpOrDown
-appIcon.image = NSWorkspace.shared.icon(forFile: sourcePath)
+
+var loadedAppIcon: NSImage?
+let resourcesDir = URL(fileURLWithPath: sourcePath).appendingPathComponent("Contents/Resources")
+for name in ["AppIcon.png", "logo-jobsmonitor.png", "AppIcon.icns"] {
+    let iconPath = resourcesDir.appendingPathComponent(name).path
+    if FileManager.default.fileExists(atPath: iconPath), let img = NSImage(contentsOfFile: iconPath) {
+        loadedAppIcon = img
+        break
+    }
+}
+if loadedAppIcon == nil {
+    loadedAppIcon = NSWorkspace.shared.icon(forFile: sourcePath)
+}
+loadedAppIcon?.size = NSSize(width: iconSize, height: iconSize)
+appIcon.image = loadedAppIcon
 appIcon.fileURL = URL(fileURLWithPath: sourcePath)
 bg.addSubview(appIcon)
 
