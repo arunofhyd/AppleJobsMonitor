@@ -630,12 +630,8 @@ func detectExperienceLevel(title: String, summary: String) -> String? {
         return "Advanced"
     }
     
-    // 6. Standard professional roles defaulting to Mid
-    if titleLower.contains("engineer") || titleLower.contains("specialist") || titleLower.contains("expert") || titleLower.contains("consultant") || titleLower.contains("developer") || titleLower.contains("designer") || titleLower.contains("analyst") || titleLower.contains("planner") || titleLower.contains("pro") || titleLower.contains("genius") || titleLower.contains("creative") {
-        return "Mid"
-    }
-    
-    return nil
+    // 6. Standard individual contributor roles defaulting to Mid
+    return "Mid"
 }
 
 struct StateData: Codable {
@@ -740,12 +736,12 @@ func generateDashboardHTML(
     
     let levelFilterPills = """
     <div class="filter-group">
-      <button class="filter-pill level-pill active" onclick="setLevelFilter('all', this)">All <span class="pill-count">\(totalCount)</span></button>
-      <button class="filter-pill level-pill" onclick="setLevelFilter('intern', this)">Intern <span class="pill-count">\(countIntern)</span></button>
-      <button class="filter-pill level-pill" onclick="setLevelFilter('early', this)">Early <span class="pill-count">\(countEarly)</span></button>
-      <button class="filter-pill level-pill" onclick="setLevelFilter('mid', this)">Mid <span class="pill-count">\(countMid)</span></button>
-      <button class="filter-pill level-pill" onclick="setLevelFilter('advanced', this)">Advanced <span class="pill-count">\(countAdvanced)</span></button>
-      <button class="filter-pill level-pill" onclick="setLevelFilter('director', this)">Director <span class="pill-count">\(countDirector)</span></button>
+      <button class="filter-pill level-pill active" onclick="setLevelFilter('all', this)">All Levels <span class="pill-count" id="pill-count-level-all">\(totalCount)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('intern', this)">Intern <span class="pill-count" id="pill-count-level-intern">\(countIntern)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('early', this)">Early <span class="pill-count" id="pill-count-level-early">\(countEarly)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('mid', this)">Mid <span class="pill-count" id="pill-count-level-mid">\(countMid)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('advanced', this)">Advanced <span class="pill-count" id="pill-count-level-advanced">\(countAdvanced)</span></button>
+      <button class="filter-pill level-pill" onclick="setLevelFilter('director', this)">Director <span class="pill-count" id="pill-count-level-director">\(countDirector)</span></button>
     </div>
     """
     
@@ -787,9 +783,9 @@ func generateDashboardHTML(
         <div class="filter-bar">
           <div class="filters-left">
             <div class="filter-group">
-              <button class="filter-pill portal-pill active" onclick="setPortalFilter('all', this)">All Portals <span class="pill-count">\(totalCount)</span></button>
-              <button class="filter-pill portal-pill" onclick="setPortalFilter('internal', this)"> Internal <span class="pill-count">\(internalTotalCount)</span></button>
-              <button class="filter-pill portal-pill" onclick="setPortalFilter('public', this)">\(groupFilledIconSvg)Public <span class="pill-count">\(publicTotalCount)</span></button>
+              <button class="filter-pill portal-pill active" onclick="setPortalFilter('all', this)">All Portals <span class="pill-count" id="pill-count-portal-all">\(totalCount)</span></button>
+              <button class="filter-pill portal-pill" onclick="setPortalFilter('internal', this)"> Internal <span class="pill-count" id="pill-count-portal-internal">\(internalTotalCount)</span></button>
+              <button class="filter-pill portal-pill" onclick="setPortalFilter('public', this)">\(groupFilledIconSvg)Public <span class="pill-count" id="pill-count-portal-public">\(publicTotalCount)</span></button>
             </div>
             \(levelFilterPills)
           </div>
@@ -1089,6 +1085,51 @@ func generateDashboardHTML(
         var careersSearchUrl = "\(careersSearchUrl)";
         var groupIconHtml = '<svg class="portal-icon" style="vertical-align:-1.5px; width:13px; height:13px; margin:0 3px;" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7Zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216ZM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg>';
         
+        function updateDynamicPillCounts(query) {
+          var rows = document.querySelectorAll('tbody tr[data-both]');
+          var levelCounts = { all: 0, intern: 0, early: 0, mid: 0, advanced: 0, director: 0 };
+          var portalCounts = { all: 0, internal: 0, public: 0 };
+
+          rows.forEach(function(row) {
+            var inInternal = (row.getAttribute('data-internal') === 'true');
+            var inPublic = (row.getAttribute('data-public') === 'true');
+            var level = (row.getAttribute('data-level') || 'mid').toLowerCase();
+            var text = row.textContent.toLowerCase();
+            var matchQuery = (query === '' || text.indexOf(query) !== -1);
+
+            if (!matchQuery) return;
+
+            // Tally level counts for rows matching current portal selection
+            var matchPortal = (activePortalFilter === 'all') ||
+                              (activePortalFilter === 'internal' && inInternal) ||
+                              (activePortalFilter === 'public' && inPublic);
+            if (matchPortal) {
+              levelCounts.all++;
+              if (levelCounts[level] !== undefined) {
+                levelCounts[level]++;
+              }
+            }
+
+            // Tally portal counts for rows matching current level selection
+            var matchLevel = (activeLevelFilter === 'all') || (level === activeLevelFilter);
+            if (matchLevel) {
+              portalCounts.all++;
+              if (inInternal) portalCounts.internal++;
+              if (inPublic) portalCounts.public++;
+            }
+          });
+
+          for (var k in levelCounts) {
+            var el = document.getElementById('pill-count-level-' + k);
+            if (el) el.textContent = levelCounts[k];
+          }
+
+          for (var p in portalCounts) {
+            var pEl = document.getElementById('pill-count-portal-' + p);
+            if (pEl) pEl.textContent = portalCounts[p];
+          }
+        }
+        
         function setPortalFilter(type, btn) {
           document.querySelectorAll('.portal-pill').forEach(function(el) { el.classList.remove('active'); });
           if (btn) btn.classList.add('active');
@@ -1161,7 +1202,7 @@ func generateDashboardHTML(
               matchPortal = (row.getAttribute('data-public') === 'true');
             }
             
-            var rowLevel = (row.getAttribute('data-level') || '').toLowerCase();
+            var rowLevel = (row.getAttribute('data-level') || 'mid').toLowerCase();
             var matchLevel = false;
             if (activeLevelFilter === 'all') {
               matchLevel = true;
@@ -1179,6 +1220,8 @@ func generateDashboardHTML(
               row.style.display = 'none';
             }
           });
+          
+          updateDynamicPillCounts(query);
           
           var noMatch = document.getElementById('no-match-row');
           if (noMatch) {
@@ -3271,8 +3314,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let firstName = getUserFirstName()
         let modeSubtitle = effectiveInternalMode ? (settings.internalOnly ? " [Internal Only]" : " [Public + Internal]") : ""
         let greeting = effectiveInternalMode && !settings.internalOnly
-            ? "Hi \(firstName) 👋 — \(top40Internal.count) Internal & \(top40Public.count) Public active roles tracked for <strong>\(settings.locationTitle)</strong>:"
-            : "Hi \(firstName) 👋 — \(min(40, displayJobs.count)) latest active roles currently tracked for <strong>\(settings.locationTitle)</strong>\(modeSubtitle):"
+            ? "Hi \(firstName) 👋 — \(displayJobs.count) unique active roles (\(top40Internal.count) Internal, \(top40Public.count) Public) tracked for <strong>\(settings.locationTitle)</strong>:"
+            : "Hi \(firstName) 👋 — \(displayJobs.count) latest active roles tracked for <strong>\(settings.locationTitle)</strong>\(modeSubtitle):"
             
         let htmlStr = generateDashboardHTML(jobs: displayJobs,
                                              internalIdSet: internalIdSet,
