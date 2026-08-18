@@ -48,23 +48,41 @@ printf "\n"
 
 # ---- Step 2: Workspace & Fetch Source --------------------------------------
 step "Preparing temporary build workspace…"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT
 
-step "Fetching latest source code from GitHub…"
-if ! curl -sSL "$MAIN_SWIFT_URL" -o "$BUILD_DIR/main.swift"; then
-    fail "Could not fetch main.swift from GitHub. Please check your internet connection."
-    exit 1
+if [ -f "$SCRIPT_DIR/main.swift" ]; then
+    step "Using local source code from repository…"
+    cp "$SCRIPT_DIR/main.swift" "$BUILD_DIR/main.swift"
+    [ -f "$SCRIPT_DIR/logo-jobsmonitor.png" ] && cp "$SCRIPT_DIR/logo-jobsmonitor.png" "$BUILD_DIR/logo-jobsmonitor.png"
+    [ -f "$SCRIPT_DIR/AppIcon.icns" ] && cp "$SCRIPT_DIR/AppIcon.icns" "$BUILD_DIR/AppIcon.icns"
+    [ -f "$SCRIPT_DIR/AppIcon.png" ] && cp "$SCRIPT_DIR/AppIcon.png" "$BUILD_DIR/AppIcon.png"
+else
+    step "Fetching latest source code from GitHub…"
+    if ! curl -sSL "$MAIN_SWIFT_URL" -o "$BUILD_DIR/main.swift"; then
+        fail "Could not fetch main.swift from GitHub. Please check your internet connection."
+        exit 1
+    fi
+    curl -sSL "$LOGO_PNG_URL" -o "$BUILD_DIR/logo-jobsmonitor.png" 2>/dev/null || true
 fi
 
-curl -sSL "$LOGO_PNG_URL" -o "$BUILD_DIR/logo-jobsmonitor.png" 2>/dev/null || true
-ok "Latest source code fetched successfully."
+# Dynamically extract version as single source of truth
+APP_VERSION="$(grep -m1 'let APP_VERSION = ' "$BUILD_DIR/main.swift" 2>/dev/null | sed -E 's/.*"([^"]+)".*/\1/' || true)"
+if [ -z "$APP_VERSION" ] && [ -f "$SCRIPT_DIR/version.json" ]; then
+    APP_VERSION="$(grep -m1 '"version":' "$SCRIPT_DIR/version.json" 2>/dev/null | sed -E 's/.*"version":[[:space:]]*"([^"]+)".*/\1/' || true)"
+fi
+if [ -z "$APP_VERSION" ]; then
+    APP_VERSION="2.2.7"
+fi
+
+ok "Source code and assets prepared (v${APP_VERSION})."
 printf "\n"
 
 # ---- Step 3: Compiling the app -------------------------------------------
-step "Compiling Jobs Monitor…"
+step "Compiling Jobs Monitor v${APP_VERSION}…"
 COMPILE_ERR="$(mktemp)"
-if ! swiftc -O "$BUILD_DIR/main.swift" -o "$BUILD_DIR/$APP_NAME" -framework AppKit -framework ServiceManagement -framework UserNotifications -framework SwiftUI -framework Foundation 2>"$COMPILE_ERR"; then
+if ! swiftc -O "$BUILD_DIR/main.swift" -o "$BUILD_DIR/$APP_NAME" -framework AppKit -framework ServiceManagement -framework UserNotifications -framework SwiftUI -framework Foundation -framework WebKit -framework AVFoundation 2>"$COMPILE_ERR"; then
     fail "Could not compile the application."
     if [ -s "$COMPILE_ERR" ]; then
         printf "  ${GREY}Compiler Error:${NC}\n"
@@ -81,7 +99,6 @@ printf "\n"
 # ---- Step 4: Building app bundle & app icon -------------------------------
 step "Building app bundle & app icon…"
 if [ "$1" = "--ci" ] || [ "$CI" = "true" ]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     BUILD_DIR_LOCAL="$SCRIPT_DIR/Build"
     mkdir -p "$BUILD_DIR_LOCAL"
     TARGET_APP="$BUILD_DIR_LOCAL/$APP_NAME.app"
@@ -97,9 +114,9 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 chmod 755 "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
-if [ -f "$BUILD_DIR/logo-jobsmonitor.png" ]; then
-    cp "$BUILD_DIR/logo-jobsmonitor.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
-fi
+[ -f "$BUILD_DIR/AppIcon.icns" ] && cp "$BUILD_DIR/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+[ -f "$BUILD_DIR/AppIcon.png" ] && cp "$BUILD_DIR/AppIcon.png" "$APP_BUNDLE/Contents/Resources/AppIcon.png"
+[ -f "$BUILD_DIR/logo-jobsmonitor.png" ] && cp "$BUILD_DIR/logo-jobsmonitor.png" "$APP_BUNDLE/Contents/Resources/logo-jobsmonitor.png"
 
 cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -117,7 +134,7 @@ cat << EOF > "$APP_BUNDLE/Contents/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.2.7</string>
+    <string>$APP_VERSION</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSUIElement</key>
