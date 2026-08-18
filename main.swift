@@ -1099,7 +1099,12 @@ func generateDashboardHTML(
 
             if (!matchQuery) return;
 
-            // Tally level counts for rows matching current portal selection
+            // Portal counts always represent the total roles available in each portal
+            portalCounts.all++;
+            if (inInternal) portalCounts.internal++;
+            if (inPublic) portalCounts.public++;
+
+            // Level counts reflect the breakdown of the currently active portal
             var matchPortal = (activePortalFilter === 'all') ||
                               (activePortalFilter === 'internal' && inInternal) ||
                               (activePortalFilter === 'public' && inPublic);
@@ -1108,14 +1113,6 @@ func generateDashboardHTML(
               if (levelCounts[level] !== undefined) {
                 levelCounts[level]++;
               }
-            }
-
-            // Tally portal counts for rows matching current level selection
-            var matchLevel = (activeLevelFilter === 'all') || (level === activeLevelFilter);
-            if (matchLevel) {
-              portalCounts.all++;
-              if (inInternal) portalCounts.internal++;
-              if (inPublic) portalCounts.public++;
             }
           });
 
