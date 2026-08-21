@@ -69,15 +69,21 @@ else
     curl -sSL "$APP_ICON_ICNS_URL" -o "$BUILD_DIR/AppIcon.icns" 2>/dev/null || true
     curl -sSL "$APP_ICON_PNG_URL" -o "$BUILD_DIR/AppIcon.png" 2>/dev/null || true
     curl -sSL "$LOGO_PNG_URL" -o "$BUILD_DIR/logo-jobsmonitor.png" 2>/dev/null || true
+    curl -sSL "$VERSION_CHECK_URL" -o "$BUILD_DIR/version.json" 2>/dev/null || true
 fi
 
-# Dynamically extract version as single source of truth
-APP_VERSION="$(grep -m1 'let APP_VERSION = ' "$BUILD_DIR/main.swift" 2>/dev/null | sed -E 's/.*"([^"]+)".*/\1/' || true)"
-if [ -z "$APP_VERSION" ] && [ -f "$SCRIPT_DIR/version.json" ]; then
-    APP_VERSION="$(grep -m1 '"version":' "$SCRIPT_DIR/version.json" 2>/dev/null | sed -E 's/.*"version":[[:space:]]*"([^"]+)".*/\1/' || true)"
+# Dynamically extract version from version.json as single source of truth
+APP_VERSION=""
+if [ -f "$BUILD_DIR/version.json" ]; then
+    APP_VERSION=$(python3 -c "import json; print(json.load(open('$BUILD_DIR/version.json'))['version'])" 2>/dev/null || true)
+elif [ -f "$SCRIPT_DIR/version.json" ]; then
+    APP_VERSION=$(python3 -c "import json; print(json.load(open('$SCRIPT_DIR/version.json'))['version'])" 2>/dev/null || true)
 fi
 if [ -z "$APP_VERSION" ]; then
-    APP_VERSION="2.2.7"
+    APP_VERSION="$(grep -m1 'APP_VERSION' "$BUILD_DIR/main.swift" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)"
+fi
+if [ -z "$APP_VERSION" ]; then
+    APP_VERSION="2.2.8"
 fi
 
 ok "Source code and assets prepared (v${APP_VERSION})."
