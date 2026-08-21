@@ -1,7 +1,15 @@
 {
-  "version": "2.2.8",
+  "version": "2.2.9",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.2.9",
+      "date": "2026-08-21",
+      "changes": [
+        "Dynamic Version Resolution: Standardized appVersion to load directly from bundle CFBundleShortVersionString with robust fallback.",
+        "Installer & GitHub Release Sync: Fixed one-liner terminal installer to fetch and parse version.json ensuring correct version builds across local and CI releases."
+      ]
+    },
     {
       "version": "2.2.8",
       "date": "2026-08-18",
