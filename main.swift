@@ -1043,9 +1043,9 @@ func generateDashboardHTML(
         </div>
         <div class="content">
           \(ssoExpired ? """
-          <div style="background: rgba(255, 149, 0, 0.12); border: 1px solid rgba(255, 149, 0, 0.35); border-radius: 12px; padding: 12px 18px; margin-bottom: 18px; font-size: 13.5px; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 18px;">⚠️</span>
-            <span><strong>AppleConnect Session Expired:</strong> Apple internal roles require active SSO authentication. Showing latest <strong>Public Roles</strong> as fallback. Open <strong>Preferences</strong> in the menu bar to re-authenticate.</span>
+          <div style="background: var(--bg-page); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; margin-bottom: 16px; font-size: 12px; color: var(--text-sec); display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 13px; opacity: 0.85;">⚠️</span>
+            <span>AppleConnect session expired. Showing public roles as fallback — re-authenticate in Preferences via the menu bar.</span>
           </div>
           """ : "")
           <p class="greeting">\(greeting)</p>
