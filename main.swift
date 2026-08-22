@@ -21,6 +21,82 @@ let stateFile = appDir.appendingPathComponent("seen_jobs.json")
 let settingsFile = appDir.appendingPathComponent("settings.json")
 let dashboardFile = appDir.appendingPathComponent("JobsMonitor_dash.html")
 let logFile = appDir.appendingPathComponent("monitor.log")
+let cookieFile = appDir.appendingPathComponent("auth_cookies.json")
+
+// ── AppleConnect Persistent Cookie Engine ─────────────────────────────────────
+func persistAppleCookies(_ cookies: [HTTPCookie]) {
+    let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
+    guard !appleCookies.isEmpty else { return }
+    
+    var cookieDicts: [[String: Any]] = []
+    for c in appleCookies {
+        var props: [String: Any] = [:]
+        props[HTTPCookiePropertyKey.name.rawValue] = c.name
+        props[HTTPCookiePropertyKey.value.rawValue] = c.value
+        props[HTTPCookiePropertyKey.domain.rawValue] = c.domain
+        props[HTTPCookiePropertyKey.path.rawValue] = c.path
+        props[HTTPCookiePropertyKey.secure.rawValue] = c.isSecure ? "TRUE" : "FALSE"
+        
+        // Extend session cookies to 30 days so WebKit / OS sleep doesn't drop them
+        let futureDate = Date(timeIntervalSinceNow: 86400 * 30)
+        let expDate = (c.expiresDate != nil && (c.expiresDate?.timeIntervalSinceNow ?? 0) > 86400 * 7) ? c.expiresDate! : futureDate
+        props[HTTPCookiePropertyKey.expires.rawValue] = expDate.timeIntervalSince1970
+        props[HTTPCookiePropertyKey.discard.rawValue] = "FALSE"
+        
+        cookieDicts.append(props)
+    }
+    
+    if let data = try? JSONSerialization.data(withJSONObject: cookieDicts, options: []) {
+        try? data.write(to: cookieFile, options: .atomic)
+    }
+}
+
+func loadPersistedAppleCookies() -> [HTTPCookie] {
+    guard let data = try? Data(contentsOf: cookieFile),
+          let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+        return []
+    }
+    
+    var cookies: [HTTPCookie] = []
+    for dict in array {
+        var props: [HTTPCookiePropertyKey: Any] = [:]
+        if let name = dict[HTTPCookiePropertyKey.name.rawValue] as? String { props[.name] = name }
+        if let val = dict[HTTPCookiePropertyKey.value.rawValue] as? String { props[.value] = val }
+        if let dom = dict[HTTPCookiePropertyKey.domain.rawValue] as? String { props[.domain] = dom }
+        if let p = dict[HTTPCookiePropertyKey.path.rawValue] as? String { props[.path] = p }
+        if let sec = dict[HTTPCookiePropertyKey.secure.rawValue] as? String { props[.secure] = sec }
+        if let exp = dict[HTTPCookiePropertyKey.expires.rawValue] as? Double {
+            props[.expires] = Date(timeIntervalSince1970: exp)
+        } else {
+            props[.expires] = Date(timeIntervalSinceNow: 86400 * 30)
+        }
+        props[.discard] = "FALSE"
+        
+        if let c = HTTPCookie(properties: props) {
+            cookies.append(c)
+        }
+    }
+    return cookies
+}
+
+func restorePersistedCookiesToWebKit(completion: (() -> Void)? = nil) {
+    let saved = loadPersistedAppleCookies()
+    guard !saved.isEmpty else {
+        completion?()
+        return
+    }
+    let store = WKWebsiteDataStore.default().httpCookieStore
+    let group = DispatchGroup()
+    for c in saved {
+        group.enter()
+        store.setCookie(c) {
+            group.leave()
+        }
+    }
+    group.notify(queue: .main) {
+        completion?()
+    }
+}
 
 // ── Smooth Hardware-Accelerated Changelog View ────────────────────────────────
 struct ChangelogAlertView: View {
@@ -1715,6 +1791,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
                     self?.didCompleteAuthSuccessfully = true
                     self?.statusLabel.stringValue = "✔ Successfully Authenticated with AppleConnect!"
                     self?.statusLabel.textColor = .systemGreen
+                    persistAppleCookies(appleCookies)
                     var state = loadStateData()
                     state.isAppleConnectAuthenticated = true
                     state.hasEverAuthenticatedInternal = true
@@ -1749,6 +1826,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
     }
 
     static func clearSession(completion: @escaping () -> Void) {
+        try? FileManager.default.removeItem(at: cookieFile)
         let store = WKWebsiteDataStore.default()
         let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
         store.removeData(ofTypes: dataTypes, modifiedSince: Date.distantPast) {
@@ -2649,6 +2727,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         
         let settings = loadSettings()
         configureLaunchAtLogin(enabled: settings.launchAtLogin)
+        restorePersistedCookiesToWebKit()
         
         // Menu Bar Item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -2948,7 +3027,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
     
     @objc func macOSDidWake(_ notification: Notification) {
-        logMessage("macOS woke from sleep — waiting 3s for network connection before evaluating timers")
+        logMessage("macOS woke from sleep — restoring cookies and waiting 3s for network connection before evaluating timers")
+        restorePersistedCookiesToWebKit()
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
             self?.evaluateAndScheduleTimer()
             self?.scheduleDailyTimer()
@@ -3183,7 +3263,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         
         if internalModeActive {
             WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
-                let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
+                var appleCookies = cookies.filter { $0.domain.contains("apple.com") }
+                if appleCookies.isEmpty {
+                    appleCookies = loadPersistedAppleCookies()
+                } else {
+                    persistAppleCookies(appleCookies)
+                }
                 fetchChannel(baseUrlStr: internalBaseUrl, isInternalChannel: true, cookies: appleCookies)
                 
                 group.notify(queue: .main) {
