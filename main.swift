@@ -665,6 +665,7 @@ func generateDashboardHTML(
     publicTotalCount: Int,
     enableInternalMode: Bool,
     internalOnly: Bool,
+    ssoExpired: Bool = false,
     greeting: String,
     locationTitle: String,
     publicSearchUrl: String,
@@ -1041,6 +1042,12 @@ func generateDashboardHTML(
           <div class="header-title"> Jobs Monitor · \(locationTitle)</div>
         </div>
         <div class="content">
+          \(ssoExpired ? """
+          <div style="background: rgba(255, 149, 0, 0.12); border: 1px solid rgba(255, 149, 0, 0.35); border-radius: 12px; padding: 12px 18px; margin-bottom: 18px; font-size: 13.5px; color: var(--text-main); display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 18px;">⚠️</span>
+            <span><strong>AppleConnect Session Expired:</strong> Apple internal roles require active SSO authentication. Showing latest <strong>Public Roles</strong> as fallback. Open <strong>Preferences</strong> in the menu bar to re-authenticate.</span>
+          </div>
+          """ : "")
           <p class="greeting">\(greeting)</p>
           
           \(filterBarHtml)
@@ -2941,9 +2948,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
     
     @objc func macOSDidWake(_ notification: Notification) {
-        logMessage("macOS woke from sleep — evaluating timer status and scheduled daily digest")
-        evaluateAndScheduleTimer()
-        scheduleDailyTimer()
+        logMessage("macOS woke from sleep — waiting 3s for network connection before evaluating timers")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            self?.evaluateAndScheduleTimer()
+            self?.scheduleDailyTimer()
+        }
     }
     
     func scheduleTimer() {
@@ -3169,13 +3178,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             }
         }
         
+        // ── ALWAYS fetch Public Jobs concurrently as guaranteed primary/fallback source ──
+        fetchChannel(baseUrlStr: publicBaseUrl, isInternalChannel: false)
+        
         if internalModeActive {
             WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
                 let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
-                
-                if !settings.internalOnly {
-                    fetchChannel(baseUrlStr: publicBaseUrl, isInternalChannel: false)
-                }
                 fetchChannel(baseUrlStr: internalBaseUrl, isInternalChannel: true, cookies: appleCookies)
                 
                 group.notify(queue: .main) {
@@ -3183,8 +3191,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 }
             }
         } else {
-            fetchChannel(baseUrlStr: publicBaseUrl, isInternalChannel: false)
-            
             group.notify(queue: .main) { [weak self] in
                 self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: [], ssoExpiredDetected: false, internalModeActive: false, settings: settings, isManual: isManual)
             }
@@ -3229,6 +3235,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let publicIdSet = Set(top40Public.map { $0.id })
         let internalIdSet = Set(top40Internal.map { $0.id })
         
+        // Check if SSO session is expired or unauthenticated
+        let isSSOExpired = internalModeActive && (ssoExpiredDetected || top40Internal.isEmpty)
+        
         // Build unified list for dashboard
         var unifiedMap: [String: JobItem] = [:]
         var unifiedOrder: [String] = []
@@ -3252,13 +3261,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         }
         
         if internalModeActive && settings.internalOnly {
-            displayJobs = top40Internal
-        } else if !internalModeActive {
+            if !top40Internal.isEmpty {
+                displayJobs = top40Internal
+            } else {
+                logMessage("⚠️ Internal roles unavailable (SSO expired). Falling back to \(top40Public.count) public roles.")
+                displayJobs = top40Public
+            }
+        } else if !internalModeActive || top40Internal.isEmpty {
             displayJobs = top40Public
         }
         
         let totalUniqueRoles = displayJobs.count
-        if internalModeActive {
+        if internalModeActive && !top40Internal.isEmpty {
             logMessage("Fetched \(totalUniqueRoles) total active roles (\(top40Internal.count) top internal, \(top40Public.count) top public) for \(settings.locationTitle)")
         } else {
             logMessage("Fetched \(displayJobs.count) total roles for \(settings.locationTitle)")
@@ -3279,9 +3293,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         state.last_check_timestamp = now.timeIntervalSince1970
         
         if internalModeActive {
-            if ssoExpiredDetected || internalJobs.isEmpty {
+            if isSSOExpired {
                 state.ssoSessionExpired = true
-                logMessage("⚠️ AppleConnect SSO session appears expired. Re-authentication needed.")
+                logMessage("⚠️ AppleConnect SSO session appears expired. Public roles active as fallback.")
             } else {
                 state.ssoSessionExpired = false
                 state.isAppleConnectAuthenticated = true
@@ -3299,26 +3313,32 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         updateBadge(unreadCount: currentUnread)
         rebuildMenu()
         
-        let effectiveInternalMode = internalModeActive && (state.ssoSessionExpired != true)
+        let effectiveInternalMode = internalModeActive && !isSSOExpired && !top40Internal.isEmpty
         let firstName = getUserFirstName()
         let modeSubtitle = effectiveInternalMode ? (settings.internalOnly ? " [Internal Only]" : " [Public + Internal]") : ""
         let greeting = effectiveInternalMode && !settings.internalOnly
             ? "Hi \(firstName) 👋 — \(displayJobs.count) unique active roles (\(top40Internal.count) Internal, \(top40Public.count) Public) tracked for <strong>\(settings.locationTitle)</strong>:"
             : "Hi \(firstName) 👋 — \(displayJobs.count) latest active roles tracked for <strong>\(settings.locationTitle)</strong>\(modeSubtitle):"
             
-        let htmlStr = generateDashboardHTML(jobs: displayJobs,
-                                             internalIdSet: internalIdSet,
-                                             publicIdSet: publicIdSet,
-                                             internalTotalCount: top40Internal.count,
-                                             publicTotalCount: top40Public.count,
-                                             enableInternalMode: effectiveInternalMode,
-                                             internalOnly: settings.internalOnly && effectiveInternalMode,
-                                             greeting: greeting,
-                                             locationTitle: "\(settings.locationTitle)\(modeSubtitle)",
-                                             publicSearchUrl: settings.activeUrl,
-                                             careersSearchUrl: settings.activeCareersUrl)
-        
-        try? htmlStr.write(to: dashboardFile, atomically: true, encoding: .utf8)
+        // ── Cache Preservation: Never overwrite previous dashboard with 0 roles on network glitches ──
+        if displayJobs.isEmpty && FileManager.default.fileExists(atPath: dashboardFile.path) {
+            logMessage("⚠️ Job fetch returned 0 roles (possible network disconnection). Preserving previous dashboard cache.")
+        } else {
+            let htmlStr = generateDashboardHTML(jobs: displayJobs,
+                                                 internalIdSet: internalIdSet,
+                                                 publicIdSet: publicIdSet,
+                                                 internalTotalCount: top40Internal.count,
+                                                 publicTotalCount: top40Public.count,
+                                                 enableInternalMode: effectiveInternalMode,
+                                                 internalOnly: settings.internalOnly && effectiveInternalMode,
+                                                 ssoExpired: isSSOExpired,
+                                                 greeting: greeting,
+                                                 locationTitle: "\(settings.locationTitle)\(modeSubtitle)",
+                                                 publicSearchUrl: settings.activeUrl,
+                                                 careersSearchUrl: settings.activeCareersUrl)
+            
+            try? htmlStr.write(to: dashboardFile, atomically: true, encoding: .utf8)
+        }
         
         if !newJobs.isEmpty {
             let plural = newJobs.count > 1 ? "s" : ""
