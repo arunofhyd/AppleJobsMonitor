@@ -1783,12 +1783,39 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         progressIndicator.startAnimation(nil)
+        let currentUrl = webView.url?.absoluteString ?? ""
+        let lowerUrl = currentUrl.lowercased()
+        if lowerUrl.contains("idmsa") || lowerUrl.contains("appleid") || lowerUrl.contains("appleconnect") || lowerUrl.contains("signin") {
+            statusLabel.stringValue = "Connecting to AppleConnect login..."
+        } else {
+            statusLabel.stringValue = "Loading careers.apple.com..."
+        }
+        statusLabel.textColor = .secondaryLabelColor
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         progressIndicator.stopAnimation(nil)
         let currentUrl = webView.url?.absoluteString ?? ""
+        let lowerUrl = currentUrl.lowercased()
         logMessage("AppleConnect webView navigated to: \(currentUrl)")
+        
+        let isAuthOrLoginPage = lowerUrl.contains("idmsa.apple.com") ||
+                                lowerUrl.contains("appleconnect") ||
+                                lowerUrl.contains("appleid.apple.com") ||
+                                lowerUrl.contains("signin") ||
+                                lowerUrl.contains("authorize") ||
+                                lowerUrl.contains("oauth") ||
+                                lowerUrl.contains("login") ||
+                                currentUrl.isEmpty || currentUrl == "about:blank"
+        
+        if isAuthOrLoginPage {
+            statusLabel.stringValue = "Please enter your AppleConnect credentials above..."
+            statusLabel.textColor = .secondaryLabelColor
+        } else if lowerUrl.contains("careers.apple.com") {
+            statusLabel.stringValue = "Careers portal loaded. Click Confirm Sign In below."
+            statusLabel.textColor = .labelColor
+        }
+        
         verifyAuthentication(isManualClick: false)
     }
 
@@ -1843,11 +1870,14 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
                         self.statusLabel.textColor = .systemOrange
                     }
                 } else if isAuthOrLoginPage {
-                    self.statusLabel.stringValue = "Enter your AppleConnect credentials above, then wait for portal load..."
+                    self.statusLabel.stringValue = "Please enter your AppleConnect credentials above..."
                     self.statusLabel.textColor = .secondaryLabelColor
                 } else if self.webView.isLoading {
                     self.statusLabel.stringValue = "Loading careers.apple.com..."
                     self.statusLabel.textColor = .secondaryLabelColor
+                } else if isFullyLoadedOnCareers {
+                    self.statusLabel.stringValue = "Careers portal loaded. Click Confirm Sign In below."
+                    self.statusLabel.textColor = .labelColor
                 }
             }
         }
