@@ -31,17 +31,17 @@ func persistAppleCookies(_ cookies: [HTTPCookie]) {
     var cookieDicts: [[String: Any]] = []
     for c in appleCookies {
         var props: [String: Any] = [:]
-        props[HTTPCookiePropertyKey.name.rawValue] = c.name
-        props[HTTPCookiePropertyKey.value.rawValue] = c.value
-        props[HTTPCookiePropertyKey.domain.rawValue] = c.domain
-        props[HTTPCookiePropertyKey.path.rawValue] = c.path
-        props[HTTPCookiePropertyKey.secure.rawValue] = c.isSecure ? "TRUE" : "FALSE"
+        props["name"] = c.name
+        props["value"] = c.value
+        props["domain"] = c.domain
+        props["path"] = c.path
+        props["secure"] = c.isSecure ? "TRUE" : "FALSE"
         
         // Extend session cookies to 30 days so WebKit / OS sleep doesn't drop them
         let futureDate = Date(timeIntervalSinceNow: 86400 * 30)
         let expDate = (c.expiresDate != nil && (c.expiresDate?.timeIntervalSinceNow ?? 0) > 86400 * 7) ? c.expiresDate! : futureDate
-        props[HTTPCookiePropertyKey.expires.rawValue] = expDate.timeIntervalSince1970
-        props[HTTPCookiePropertyKey.discard.rawValue] = "FALSE"
+        props["expires"] = expDate.timeIntervalSince1970
+        props["discard"] = "FALSE"
         
         cookieDicts.append(props)
     }
@@ -60,12 +60,12 @@ func loadPersistedAppleCookies() -> [HTTPCookie] {
     var cookies: [HTTPCookie] = []
     for dict in array {
         var props: [HTTPCookiePropertyKey: Any] = [:]
-        if let name = dict[HTTPCookiePropertyKey.name.rawValue] as? String { props[.name] = name }
-        if let val = dict[HTTPCookiePropertyKey.value.rawValue] as? String { props[.value] = val }
-        if let dom = dict[HTTPCookiePropertyKey.domain.rawValue] as? String { props[.domain] = dom }
-        if let p = dict[HTTPCookiePropertyKey.path.rawValue] as? String { props[.path] = p }
-        if let sec = dict[HTTPCookiePropertyKey.secure.rawValue] as? String { props[.secure] = sec }
-        if let exp = dict[HTTPCookiePropertyKey.expires.rawValue] as? Double {
+        if let name = dict["name"] as? String { props[.name] = name }
+        if let val = dict["value"] as? String { props[.value] = val }
+        if let dom = dict["domain"] as? String { props[.domain] = dom }
+        if let p = dict["path"] as? String { props[.path] = p }
+        if let sec = dict["secure"] as? String { props[.secure] = sec }
+        if let exp = dict["expires"] as? Double {
             props[.expires] = Date(timeIntervalSince1970: exp)
         } else {
             props[.expires] = Date(timeIntervalSinceNow: 86400 * 30)
@@ -1715,7 +1715,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         bottomBar.wantsLayer = true
         bottomBar.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         
-        statusLabel = NSTextField(labelWithString: "Sign in with your Apple account to enable Internal Mode...")
+        statusLabel = NSTextField(labelWithString: "Sign in with your Apple account. Click Confirm Sign In once careers.apple.com loads.")
         statusLabel.frame = NSRect(x: 16, y: 14, width: contentView.bounds.width - 240, height: 20)
         statusLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         statusLabel.textColor = .secondaryLabelColor
@@ -1737,6 +1737,32 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         bottomBar.addSubview(progressIndicator)
         
         contentView.addSubview(bottomBar)
+        
+        // Top Floating Guidance Overlay (Translucent Frosted Glass)
+        let topBar = NSVisualEffectView(frame: NSRect(x: 16, y: contentView.bounds.height - 52, width: contentView.bounds.width - 32, height: 38))
+        topBar.autoresizingMask = [.width, .minYMargin]
+        topBar.material = .headerView
+        topBar.blendingMode = .withinWindow
+        topBar.state = .active
+        topBar.wantsLayer = true
+        topBar.layer?.cornerRadius = 12
+        topBar.layer?.borderWidth = 1
+        topBar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.35).cgColor
+        topBar.layer?.masksToBounds = true
+        
+        let guideIcon = NSImageView(frame: NSRect(x: 12, y: 10, width: 18, height: 18))
+        guideIcon.image = NSImage(systemSymbolName: "lock.shield.fill", accessibilityDescription: nil)
+        guideIcon.contentTintColor = .systemBlue
+        topBar.addSubview(guideIcon)
+        
+        let guideLabel = NSTextField(labelWithString: "Sign in with AppleConnect — Wait for careers.apple.com to finish loading, then click Confirm Sign In below.")
+        guideLabel.frame = NSRect(x: 36, y: 9, width: topBar.bounds.width - 48, height: 20)
+        guideLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        guideLabel.textColor = .labelColor
+        guideLabel.autoresizingMask = [.width]
+        topBar.addSubview(guideLabel)
+        
+        contentView.addSubview(topBar)
         win.contentView = contentView
     }
 
@@ -1751,6 +1777,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         let req = URLRequest(url: url)
         progressIndicator.startAnimation(nil)
         statusLabel.stringValue = "Loading Apple internal careers portal..."
+        statusLabel.textColor = .secondaryLabelColor
         webView.load(req)
     }
 
@@ -1772,14 +1799,19 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
     func verifyAuthentication(isManualClick: Bool) {
         let currentUrl = webView.url?.absoluteString ?? ""
         let lowerUrl = currentUrl.lowercased()
-        let isNotOnLoginPage = lowerUrl.contains("careers.apple.com") &&
-                               !lowerUrl.contains("idmsa.apple.com") &&
-                               !lowerUrl.contains("appleconnect") &&
-                               !lowerUrl.contains("appleid.apple.com") &&
-                               !lowerUrl.contains("signin") &&
-                               !lowerUrl.contains("auth")
+        let isAuthOrLoginPage = lowerUrl.contains("idmsa.apple.com") ||
+                                lowerUrl.contains("appleconnect") ||
+                                lowerUrl.contains("appleid.apple.com") ||
+                                lowerUrl.contains("signin") ||
+                                lowerUrl.contains("authorize") ||
+                                lowerUrl.contains("oauth") ||
+                                lowerUrl.contains("login") ||
+                                currentUrl.isEmpty || currentUrl == "about:blank"
+        
+        let isFullyLoadedOnCareers = lowerUrl.contains("careers.apple.com") && !isAuthOrLoginPage && !webView.isLoading
         
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
+            guard let self = self else { return }
             let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
             let hasRealSSOToken = appleCookies.contains(where: { cookie in
                 let name = cookie.name.lowercased()
@@ -1787,30 +1819,35 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
             })
             
             DispatchQueue.main.async {
-                if (hasRealSSOToken && isNotOnLoginPage) || (isManualClick && isNotOnLoginPage) {
-                    self?.didCompleteAuthSuccessfully = true
-                    self?.statusLabel.stringValue = "✔ Successfully Authenticated with AppleConnect!"
-                    self?.statusLabel.textColor = .systemGreen
+                if isFullyLoadedOnCareers && (hasRealSSOToken || isManualClick) {
+                    self.didCompleteAuthSuccessfully = true
+                    self.statusLabel.stringValue = "✔ Successfully Authenticated with AppleConnect!"
+                    self.statusLabel.textColor = .systemGreen
                     persistAppleCookies(appleCookies)
                     var state = loadStateData()
                     state.isAppleConnectAuthenticated = true
                     state.hasEverAuthenticatedInternal = true
                     state.ssoSessionExpired = false
                     saveStateData(state)
-                    self?.onAuthCompletion?(true)
+                    self.onAuthCompletion?(true)
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        self?.window?.close()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                        self.window?.close()
                     }
                 } else if isManualClick {
-                    self?.statusLabel.stringValue = "⚠️ Please sign in to your Apple account in the window first."
-                    self?.statusLabel.textColor = .systemOrange
-                } else if lowerUrl.contains("idmsa.apple.com") || lowerUrl.contains("appleconnect") || lowerUrl.contains("appleid.apple.com") {
-                    self?.statusLabel.stringValue = "Please enter your AppleConnect credentials above..."
-                    self?.statusLabel.textColor = .secondaryLabelColor
-                } else {
-                    self?.statusLabel.stringValue = "Sign in with your Apple account above, then click Confirm."
-                    self?.statusLabel.textColor = .secondaryLabelColor
+                    if self.webView.isLoading || isAuthOrLoginPage {
+                        self.statusLabel.stringValue = "⚠️ Please wait for careers.apple.com to finish loading after sign-in."
+                        self.statusLabel.textColor = .systemOrange
+                    } else {
+                        self.statusLabel.stringValue = "⚠️ Please sign in to your Apple account in the window first."
+                        self.statusLabel.textColor = .systemOrange
+                    }
+                } else if isAuthOrLoginPage {
+                    self.statusLabel.stringValue = "Enter your AppleConnect credentials above, then wait for portal load..."
+                    self.statusLabel.textColor = .secondaryLabelColor
+                } else if self.webView.isLoading {
+                    self.statusLabel.stringValue = "Loading careers.apple.com..."
+                    self.statusLabel.textColor = .secondaryLabelColor
                 }
             }
         }
@@ -3320,8 +3357,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let publicIdSet = Set(top40Public.map { $0.id })
         let internalIdSet = Set(top40Internal.map { $0.id })
         
-        // Check if SSO session is expired or unauthenticated
-        let isSSOExpired = internalModeActive && (ssoExpiredDetected || top40Internal.isEmpty)
+        // Check if SSO session is expired (only if internal mode was on and 0 internal roles were returned)
+        let isSSOExpired = internalModeActive && top40Internal.isEmpty
         
         // Build unified list for dashboard
         var unifiedMap: [String: JobItem] = [:]
