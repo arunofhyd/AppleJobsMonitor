@@ -3272,7 +3272,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         
         var publicJobs: [JobItem] = []
         var internalJobs: [JobItem] = []
-        var ssoExpiredDetected = false
         let group = DispatchGroup()
         let lock = NSLock()
         
@@ -3305,15 +3304,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                     
                     let pageJobs = parseJobsFromHTML(html, defaultSearchUrl: baseUrlStr, settings: settings, isInternal: isInternalChannel)
                     
-                    if isInternalChannel && pageJobs.isEmpty {
-                        let lowerHtml = html.lowercased()
-                        if lowerHtml.contains("sign in with your apple account") || lowerHtml.contains("appleid.apple.com/auth/authorize") || lowerHtml.contains("login.apple.com") || lowerHtml.contains("appleconnect") {
-                            lock.lock()
-                            ssoExpiredDetected = true
-                            lock.unlock()
-                        }
-                    }
-                    
                     lock.lock()
                     if isInternalChannel {
                         internalJobs.append(contentsOf: pageJobs)
@@ -3339,17 +3329,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 fetchChannel(baseUrlStr: internalBaseUrl, isInternalChannel: true, cookies: appleCookies)
                 
                 group.notify(queue: .main) {
-                    self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, ssoExpiredDetected: ssoExpiredDetected, internalModeActive: true, settings: settings, isManual: isManual)
+                    self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, internalModeActive: true, settings: settings, isManual: isManual)
                 }
             }
         } else {
             group.notify(queue: .main) { [weak self] in
-                self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: [], ssoExpiredDetected: false, internalModeActive: false, settings: settings, isManual: isManual)
+                self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: [], internalModeActive: false, settings: settings, isManual: isManual)
             }
         }
     }
     
-    func processFetchedJobs(publicJobs: [JobItem], internalJobs: [JobItem], ssoExpiredDetected: Bool, internalModeActive: Bool, settings: AppSettings, isManual: Bool) {
+    func processFetchedJobs(publicJobs: [JobItem], internalJobs: [JobItem], internalModeActive: Bool, settings: AppSettings, isManual: Bool) {
         // 1. Deduplicate & sort public jobs
         var publicMap: [String: JobItem] = [:]
         var publicOrder: [String] = []
