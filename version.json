@@ -1,7 +1,16 @@
 {
-  "version": "2.3.0",
+  "version": "2.3.1",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.3.1",
+      "date": "2026-08-26",
+      "changes": [
+        "Enhanced OAuth Redirect Handling: Implemented navigation policy delegates and non-blocking WebKit redirect frame error recovery (Code 102/204) for AppleConnect IDMS SSO handshake.",
+        "Offscreen Host Window Lifecycle: Embedded headless WebKit instance into an offscreen AppKit host window to ensure WebProcess prioritization during background token negotiation.",
+        "Extended Sleep-Wake VPN Debounce: Extended network reconnection debounce on wake to 10 seconds to allow corporate VPN tunnels and internal DNS routing to fully establish before running overdue checks."
+      ]
+    },
     {
       "version": "2.3.0",
       "date": "2026-08-26",

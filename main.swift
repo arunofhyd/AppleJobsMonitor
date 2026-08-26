@@ -8,7 +8,7 @@ import WebKit
 // ── Global Single-Source Constants ─────────────────────────────────────────────
 let APP_VERSION: String = {
     if let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, !v.isEmpty { return v }
-    return "2.3.0"
+    return "2.3.1"
 }()
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
@@ -1913,6 +1913,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
 class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
     static let shared = AppleConnectSilentAuthEngine()
     
+    private var hostWindow: NSWindow?
     private var webView: WKWebView?
     private var completionHandler: ((Bool) -> Void)?
     private var timeoutTimer: Timer?
@@ -1922,7 +1923,7 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         super.init()
     }
     
-    func attemptSilentAuthentication(targetUrl: String? = nil, timeout: TimeInterval = 10.0, completion: @escaping (Bool) -> Void) {
+    func attemptSilentAuthentication(targetUrl: String? = nil, timeout: TimeInterval = 20.0, completion: @escaping (Bool) -> Void) {
         if !Thread.isMainThread {
             DispatchQueue.main.async {
                 self.attemptSilentAuthentication(targetUrl: targetUrl, timeout: timeout, completion: completion)
@@ -1955,8 +1956,19 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore.default()
         
-        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 100, height: 100), configuration: config)
-        webView?.navigationDelegate = self
+        let win = NSWindow(contentRect: NSRect(x: -2000, y: -2000, width: 400, height: 400),
+                           styleMask: [.borderless],
+                           backing: .buffered,
+                           defer: false)
+        win.isReleasedWhenClosed = false
+        self.hostWindow = win
+        
+        let wv = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 400), configuration: config)
+        wv.navigationDelegate = self
+        wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"
+        win.contentView?.addSubview(wv)
+        win.orderBack(nil)
+        self.webView = wv
         
         timeoutTimer?.invalidate()
         timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
@@ -1966,21 +1978,36 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         
         var request = URLRequest(url: url)
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
-        webView?.load(request)
+        wv.load(request)
+    }
+    
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(.allow)
+    }
+    
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        decisionHandler(.allow)
     }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         let currentUrl = webView.url?.absoluteString ?? ""
         let lowerUrl = currentUrl.lowercased()
-        logMessage("Silent AppleConnect WebKit resolved to: \(currentUrl)")
+        logMessage("Silent AppleConnect WebKit navigated to: \(currentUrl)")
+        
+        let isIntermediateSSOPart = lowerUrl.contains("ssotokenverify") ||
+                                    lowerUrl.contains("appleauth") ||
+                                    lowerUrl.contains("/oauth2/") ||
+                                    lowerUrl.contains("/code/idms")
+        if isIntermediateSSOPart {
+            return
+        }
         
         let isAuthOrLoginPage = lowerUrl.contains("idmsa.apple.com") ||
-                                lowerUrl.contains("appleconnect") ||
                                 lowerUrl.contains("appleid.apple.com") ||
                                 lowerUrl.contains("signin") ||
                                 lowerUrl.contains("authorize") ||
-                                lowerUrl.contains("oauth") ||
-                                lowerUrl.contains("login") ||
+                                lowerUrl.contains("/login") ||
+                                lowerUrl.contains("session-timeout") ||
                                 currentUrl.isEmpty || currentUrl == "about:blank"
         
         let isFullyLoadedOnCareers = lowerUrl.contains("careers.apple.com") && !isAuthOrLoginPage && !webView.isLoading
@@ -2010,18 +2037,32 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
                     }
                 }
             }
-        } else if isAuthOrLoginPage {
+        } else if isAuthOrLoginPage && !lowerUrl.contains("ssotokenverify") {
             logMessage("⚠️ Silent AppleConnect SSO stopped at login page (interactive 2FA/credentials required).")
             self.finish(success: false)
         }
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        let nsError = error as NSError
+        if nsError.domain == "WebKitErrorDomain" && (nsError.code == 102 || nsError.code == 204) {
+            return
+        }
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+            return
+        }
         logMessage("Silent AppleConnect navigation failed: \(error.localizedDescription)")
         finish(success: false)
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        let nsError = error as NSError
+        if nsError.domain == "WebKitErrorDomain" && (nsError.code == 102 || nsError.code == 204) {
+            return
+        }
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+            return
+        }
         logMessage("Silent AppleConnect provisional navigation failed (internal network unreachable): \(error.localizedDescription)")
         finish(success: false)
     }
@@ -2031,7 +2072,10 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         timeoutTimer = nil
         webView?.stopLoading()
         webView?.navigationDelegate = nil
+        webView?.removeFromSuperview()
         webView = nil
+        hostWindow?.close()
+        hostWindow = nil
         isAuthenticating = false
         
         let handler = completionHandler
@@ -2638,7 +2682,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
                 internalAuthStatusLabel.textColor = .systemBlue
                 enableInternalModeCheckbox.isEnabled = false
                 
-                AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 5.0) { [weak self] success in
+                AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 15.0) { [weak self] success in
                     guard let self = self else { return }
                     self.enableInternalModeCheckbox.isEnabled = true
                     
@@ -3242,9 +3286,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
     
     @objc func macOSDidWake(_ notification: Notification) {
-        logMessage("macOS woke from sleep — restoring cookies and waiting 3s for network connection before evaluating timers")
+        logMessage("macOS woke from sleep — restoring cookies and waiting 10s for corporate network/VPN connection before evaluating timers")
         restorePersistedCookiesToWebKit()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) { [weak self] in
             self?.evaluateAndScheduleTimer()
             self?.scheduleDailyTimer()
         }
@@ -3414,7 +3458,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         
         if settings.enableInternalMode && !isAuth {
             // Attempt silent background re-authentication before executing fetch
-            AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 8.0) { [weak self] success in
+            AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 20.0) { [weak self] success in
                 guard let self = self else { return }
                 self.executeCheckFetch(isManual: isManual, internalModeActive: success, allowSilentRetry: false)
             }
@@ -3494,7 +3538,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                     if internalJobs.isEmpty && allowSilentRetry {
                         // Internal fetch returned 0 roles; attempt silent background SSO refresh and retry once
                         logMessage("Internal roles empty; attempting silent background SSO refresh before finalizing...")
-                        AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 8.0) { [weak self] retrySuccess in
+                        AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 20.0) { [weak self] retrySuccess in
                             guard let self = self else { return }
                             if retrySuccess {
                                 let freshCookies = loadPersistedAppleCookies()
