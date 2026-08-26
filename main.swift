@@ -8,7 +8,7 @@ import WebKit
 // ── Global Single-Source Constants ─────────────────────────────────────────────
 let APP_VERSION: String = {
     if let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, !v.isEmpty { return v }
-    return "2.2.9"
+    return "2.3.0"
 }()
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
@@ -1909,6 +1909,139 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
     }
 }
 
+// ── AppleConnect Silent Background Authentication Engine ────────────────────────
+class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
+    static let shared = AppleConnectSilentAuthEngine()
+    
+    private var webView: WKWebView?
+    private var completionHandler: ((Bool) -> Void)?
+    private var timeoutTimer: Timer?
+    private var isAuthenticating = false
+    
+    override init() {
+        super.init()
+    }
+    
+    func attemptSilentAuthentication(targetUrl: String? = nil, timeout: TimeInterval = 10.0, completion: @escaping (Bool) -> Void) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async {
+                self.attemptSilentAuthentication(targetUrl: targetUrl, timeout: timeout, completion: completion)
+            }
+            return
+        }
+        
+        if isAuthenticating {
+            logMessage("Silent AppleConnect auth already in progress, chaining completion callback.")
+            let existing = completionHandler
+            completionHandler = { success in
+                existing?(success)
+                completion(success)
+            }
+            return
+        }
+        
+        isAuthenticating = true
+        completionHandler = completion
+        
+        let settings = loadSettings()
+        let urlStr = targetUrl ?? settings.activeCareersUrl
+        guard let url = URL(string: urlStr) else {
+            finish(success: false)
+            return
+        }
+        
+        logMessage("Initiating silent AppleConnect background SSO re-authentication via \(url.host ?? "careers.apple.com")...")
+        
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = WKWebsiteDataStore.default()
+        
+        webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 100, height: 100), configuration: config)
+        webView?.navigationDelegate = self
+        
+        timeoutTimer?.invalidate()
+        timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
+            logMessage("⚠️ Silent AppleConnect SSO timeout reached after \(timeout)s.")
+            self?.finish(success: false)
+        }
+        
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        webView?.load(request)
+    }
+    
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        let currentUrl = webView.url?.absoluteString ?? ""
+        let lowerUrl = currentUrl.lowercased()
+        logMessage("Silent AppleConnect WebKit resolved to: \(currentUrl)")
+        
+        let isAuthOrLoginPage = lowerUrl.contains("idmsa.apple.com") ||
+                                lowerUrl.contains("appleconnect") ||
+                                lowerUrl.contains("appleid.apple.com") ||
+                                lowerUrl.contains("signin") ||
+                                lowerUrl.contains("authorize") ||
+                                lowerUrl.contains("oauth") ||
+                                lowerUrl.contains("login") ||
+                                currentUrl.isEmpty || currentUrl == "about:blank"
+        
+        let isFullyLoadedOnCareers = lowerUrl.contains("careers.apple.com") && !isAuthOrLoginPage && !webView.isLoading
+        
+        if isFullyLoadedOnCareers {
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
+                guard let self = self else { return }
+                let appleCookies = cookies.filter { $0.domain.contains("apple.com") }
+                let hasRealSSOToken = appleCookies.contains(where: { cookie in
+                    let name = cookie.name.lowercased()
+                    return name == "myacinfo" || name == "dqsess" || name == "itctx" || name == "ac_session" || name == "ds_session_id" || name.contains("session") || name.contains("auth")
+                })
+                
+                DispatchQueue.main.async {
+                    if hasRealSSOToken || isFullyLoadedOnCareers {
+                        logMessage("✔ Silent AppleConnect SSO re-authentication succeeded! Fresh session cookies captured.")
+                        persistAppleCookies(appleCookies)
+                        var state = loadStateData()
+                        state.isAppleConnectAuthenticated = true
+                        state.hasEverAuthenticatedInternal = true
+                        state.ssoSessionExpired = false
+                        saveStateData(state)
+                        self.finish(success: true)
+                    } else {
+                        logMessage("⚠️ Silent AppleConnect loaded page but no SSO session tokens detected.")
+                        self.finish(success: false)
+                    }
+                }
+            }
+        } else if isAuthOrLoginPage {
+            logMessage("⚠️ Silent AppleConnect SSO stopped at login page (interactive 2FA/credentials required).")
+            self.finish(success: false)
+        }
+    }
+    
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        logMessage("Silent AppleConnect navigation failed: \(error.localizedDescription)")
+        finish(success: false)
+    }
+    
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        logMessage("Silent AppleConnect provisional navigation failed (internal network unreachable): \(error.localizedDescription)")
+        finish(success: false)
+    }
+    
+    private func finish(success: Bool) {
+        timeoutTimer?.invalidate()
+        timeoutTimer = nil
+        webView?.stopLoading()
+        webView?.navigationDelegate = nil
+        webView = nil
+        isAuthenticating = false
+        
+        let handler = completionHandler
+        completionHandler = nil
+        DispatchQueue.main.async {
+            handler?(success)
+        }
+    }
+}
+
 // ── Dynamic Appearance Card & Header Views for Preferences ──────────────────────
 class SettingsHeaderView: NSView {
     override init(frame frameRect: NSRect) {
@@ -2501,20 +2634,35 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
         
         if enableInternalModeCheckbox.state == .on {
             if !isAuth {
-                // Cannot enable without authentication
-                enableInternalModeCheckbox.state = .off
-                internalOnlyCheckbox.state = .off
-                internalOnlyCheckbox.isEnabled = false
+                internalAuthStatusLabel.stringValue = "⏳ Verifying Apple internal network..."
+                internalAuthStatusLabel.textColor = .systemBlue
+                enableInternalModeCheckbox.isEnabled = false
                 
-                let alert = NSAlert()
-                alert.messageText = "AppleConnect Authentication Required"
-                alert.informativeText = "To enable Internal Mode, please sign in with your Apple employee credentials."
-                alert.alertStyle = .informational
-                alert.addButton(withTitle: "Sign In with AppleConnect...")
-                alert.addButton(withTitle: "Cancel")
-                
-                if alert.runModal() == .alertFirstButtonReturn {
-                    signInAppleConnectClicked()
+                AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 5.0) { [weak self] success in
+                    guard let self = self else { return }
+                    self.enableInternalModeCheckbox.isEnabled = true
+                    
+                    if success {
+                        self.enableInternalModeCheckbox.state = .on
+                        self.internalOnlyCheckbox.isEnabled = true
+                        self.updateInternalAuthUI()
+                    } else {
+                        self.enableInternalModeCheckbox.state = .off
+                        self.internalOnlyCheckbox.state = .off
+                        self.internalOnlyCheckbox.isEnabled = false
+                        self.updateInternalAuthUI()
+                        
+                        let alert = NSAlert()
+                        alert.messageText = "AppleConnect Authentication Required"
+                        alert.informativeText = "To enable Internal Mode, please sign in with your Apple employee credentials."
+                        alert.alertStyle = .informational
+                        alert.addButton(withTitle: "Sign In with AppleConnect...")
+                        alert.addButton(withTitle: "Cancel")
+                        
+                        if alert.runModal() == .alertFirstButtonReturn {
+                            self.signInAppleConnectClicked()
+                        }
+                    }
                 }
                 return
             }
@@ -3263,8 +3411,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let settings = loadSettings()
         let state = loadStateData()
         let isAuth = (state.isAppleConnectAuthenticated == true)
-        let internalModeActive = settings.enableInternalMode && isAuth
         
+        if settings.enableInternalMode && !isAuth {
+            // Attempt silent background re-authentication before executing fetch
+            AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 8.0) { [weak self] success in
+                guard let self = self else { return }
+                self.executeCheckFetch(isManual: isManual, internalModeActive: success, allowSilentRetry: false)
+            }
+        } else {
+            let internalModeActive = settings.enableInternalMode && isAuth
+            executeCheckFetch(isManual: isManual, internalModeActive: internalModeActive, allowSilentRetry: settings.enableInternalMode)
+        }
+    }
+    
+    func executeCheckFetch(isManual: Bool, internalModeActive: Bool, allowSilentRetry: Bool) {
+        let settings = loadSettings()
         logMessage("Fetching roles for \(settings.locationTitle) (Internal Mode: \(internalModeActive ? "ON" : "OFF"))...")
         
         let publicBaseUrl = settings.activeUrl
@@ -3329,7 +3490,45 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 fetchChannel(baseUrlStr: internalBaseUrl, isInternalChannel: true, cookies: appleCookies)
                 
                 group.notify(queue: .main) {
-                    self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, internalModeActive: true, settings: settings, isManual: isManual)
+                    guard let self = self else { return }
+                    if internalJobs.isEmpty && allowSilentRetry {
+                        // Internal fetch returned 0 roles; attempt silent background SSO refresh and retry once
+                        logMessage("Internal roles empty; attempting silent background SSO refresh before finalizing...")
+                        AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 8.0) { [weak self] retrySuccess in
+                            guard let self = self else { return }
+                            if retrySuccess {
+                                let freshCookies = loadPersistedAppleCookies()
+                                let retryGroup = DispatchGroup()
+                                for page in 1...3 {
+                                    let sep = internalBaseUrl.contains("?") ? "&" : "?"
+                                    let pageUrlStr = "\(internalBaseUrl)\(sep)page=\(page)"
+                                    guard let url = URL(string: pageUrlStr) else { continue }
+                                    var req = URLRequest(url: url, timeoutInterval: 30)
+                                    req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+                                    let fields = HTTPCookie.requestHeaderFields(with: freshCookies)
+                                    for (k, v) in fields { req.setValue(v, forHTTPHeaderField: k) }
+                                    
+                                    retryGroup.enter()
+                                    URLSession.shared.dataTask(with: req) { data, _, _ in
+                                        defer { retryGroup.leave() }
+                                        if let data = data, let html = String(data: data, encoding: .utf8) {
+                                            let pJobs = parseJobsFromHTML(html, defaultSearchUrl: internalBaseUrl, settings: settings, isInternal: true)
+                                            lock.lock()
+                                            internalJobs.append(contentsOf: pJobs)
+                                            lock.unlock()
+                                        }
+                                    }.resume()
+                                }
+                                retryGroup.notify(queue: .main) {
+                                    self.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, internalModeActive: true, settings: settings, isManual: isManual)
+                                }
+                            } else {
+                                self.processFetchedJobs(publicJobs: publicJobs, internalJobs: [], internalModeActive: true, settings: settings, isManual: isManual)
+                            }
+                        }
+                    } else {
+                        self.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, internalModeActive: true, settings: settings, isManual: isManual)
+                    }
                 }
             }
         } else {
