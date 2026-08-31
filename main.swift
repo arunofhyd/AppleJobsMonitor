@@ -8,7 +8,7 @@ import WebKit
 // ── Global Single-Source Constants ─────────────────────────────────────────────
 let APP_VERSION: String = {
     if let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, !v.isEmpty { return v }
-    return "2.3.1"
+    return "2.3.2"
 }()
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"
@@ -1690,6 +1690,8 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
             defer: false
         )
         win.title = "AppleConnect Sign In · Jobs Monitor"
+        win.backgroundColor = .windowBackgroundColor
+        win.isOpaque = true
         win.center()
         self.init(window: win)
         win.delegate = self
@@ -1704,32 +1706,41 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore.default()
         
-        webView = WKWebView(frame: NSRect(x: 0, y: 48, width: contentView.bounds.width, height: contentView.bounds.height - 48), configuration: config)
+        webView = WKWebView(frame: NSRect(x: 0, y: 52, width: contentView.bounds.width, height: contentView.bounds.height - 52), configuration: config)
         webView.autoresizingMask = [.width, .height]
         webView.navigationDelegate = self
         contentView.addSubview(webView)
         
-        // Bottom Status Bar
-        let bottomBar = NSView(frame: NSRect(x: 0, y: 0, width: contentView.bounds.width, height: 48))
+        // Bottom Status Bar (Frosted Dynamic Visual Effect View)
+        let bottomBar = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: contentView.bounds.width, height: 52))
         bottomBar.autoresizingMask = [.width, .maxYMargin]
-        bottomBar.wantsLayer = true
-        bottomBar.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        bottomBar.material = .windowBackground
+        bottomBar.blendingMode = .withinWindow
+        bottomBar.state = .active
+        
+        let topBorder = NSBox(frame: NSRect(x: 0, y: 51, width: contentView.bounds.width, height: 1))
+        topBorder.boxType = .separator
+        topBorder.autoresizingMask = [.width, .minYMargin]
+        bottomBar.addSubview(topBorder)
         
         statusLabel = NSTextField(labelWithString: "Sign in with your Apple account. Click Confirm Sign In once careers.apple.com loads.")
-        statusLabel.frame = NSRect(x: 16, y: 14, width: contentView.bounds.width - 240, height: 20)
-        statusLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        statusLabel.textColor = .secondaryLabelColor
+        statusLabel.frame = NSRect(x: 16, y: 16, width: contentView.bounds.width - 200, height: 20)
+        statusLabel.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
+        statusLabel.textColor = .labelColor
+        statusLabel.drawsBackground = false
         statusLabel.autoresizingMask = [.width]
         bottomBar.addSubview(statusLabel)
         
         let confirmBtn = NSButton(title: "Confirm Sign In", target: self, action: #selector(confirmSignInClicked))
         confirmBtn.bezelStyle = .rounded
+        confirmBtn.controlSize = .regular
         confirmBtn.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        confirmBtn.frame = NSRect(x: contentView.bounds.width - 164, y: 8, width: 148, height: 32)
+        confirmBtn.keyEquivalent = "\r"
+        confirmBtn.frame = NSRect(x: contentView.bounds.width - 142, y: 10, width: 126, height: 32)
         confirmBtn.autoresizingMask = [.minXMargin]
         bottomBar.addSubview(confirmBtn)
         
-        progressIndicator = NSProgressIndicator(frame: NSRect(x: contentView.bounds.width - 192, y: 16, width: 16, height: 16))
+        progressIndicator = NSProgressIndicator(frame: NSRect(x: contentView.bounds.width - 168, y: 17, width: 16, height: 16))
         progressIndicator.style = .spinning
         progressIndicator.controlSize = .small
         progressIndicator.autoresizingMask = [.minXMargin]
@@ -1759,6 +1770,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         guideLabel.frame = NSRect(x: 36, y: 9, width: topBar.bounds.width - 48, height: 20)
         guideLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         guideLabel.textColor = .labelColor
+        guideLabel.drawsBackground = false
         guideLabel.autoresizingMask = [.width]
         topBar.addSubview(guideLabel)
         
@@ -1777,7 +1789,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         let req = URLRequest(url: url)
         progressIndicator.startAnimation(nil)
         statusLabel.stringValue = "Loading Apple internal careers portal..."
-        statusLabel.textColor = .secondaryLabelColor
+        statusLabel.textColor = .labelColor
         webView.load(req)
     }
 
@@ -1790,7 +1802,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         } else {
             statusLabel.stringValue = "Loading careers.apple.com..."
         }
-        statusLabel.textColor = .secondaryLabelColor
+        statusLabel.textColor = .labelColor
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -1810,7 +1822,7 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
         
         if isAuthOrLoginPage {
             statusLabel.stringValue = "Please enter your AppleConnect credentials above..."
-            statusLabel.textColor = .secondaryLabelColor
+            statusLabel.textColor = .labelColor
         } else if lowerUrl.contains("careers.apple.com") {
             statusLabel.stringValue = "Careers portal loaded. Click Confirm Sign In below."
             statusLabel.textColor = .labelColor
@@ -1871,10 +1883,10 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
                     }
                 } else if isAuthOrLoginPage {
                     self.statusLabel.stringValue = "Please enter your AppleConnect credentials above..."
-                    self.statusLabel.textColor = .secondaryLabelColor
+                    self.statusLabel.textColor = .labelColor
                 } else if self.webView.isLoading {
                     self.statusLabel.stringValue = "Loading careers.apple.com..."
-                    self.statusLabel.textColor = .secondaryLabelColor
+                    self.statusLabel.textColor = .labelColor
                 } else if isFullyLoadedOnCareers {
                     self.statusLabel.stringValue = "Careers portal loaded. Click Confirm Sign In below."
                     self.statusLabel.textColor = .labelColor
@@ -2151,6 +2163,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
     var signInAppleConnectBtn: NSButton!
     var disconnectAppleConnectBtn: NSButton!
     var authWindowController: AppleConnectAuthWindowController?
+    private weak var activeModalTextView: NSTextView?
     
     var launchAtLoginCheckbox: NSButton!
     
@@ -2245,7 +2258,7 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
         customUrlPreviewBtn.font = NSFont.systemFont(ofSize: 12, weight: .bold)
         customUrlPreviewBtn.bezelStyle = .rounded
         customUrlPreviewBtn.frame = NSRect(x: 517, y: 15, width: 35, height: 26)
-        customUrlPreviewBtn.toolTip = "View full long URL in expanded window"
+        customUrlPreviewBtn.toolTip = "View & edit full custom URL in expanded editor"
         card1.addSubview(customUrlPreviewBtn)
 
         customUrlInstructionsBtn = NSButton(title: "?", target: self, action: #selector(showCustomUrlInstructions))
@@ -2468,8 +2481,180 @@ class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSWindo
 
     @objc func showCustomUrlPreview() {
         let currentUrl = customUrlField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayUrl = currentUrl.isEmpty ? "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest" : currentUrl
-        showCustomInfoModal(title: "Current Custom Search URL", contentText: displayUrl, isMonospaced: true)
+        let initialText = currentUrl.isEmpty ? "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest" : currentUrl
+        
+        let winWidth: CGFloat = 600
+        let winHeight: CGFloat = 430
+        
+        let modalWin = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: winWidth, height: winHeight),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        modalWin.title = "Custom Search URL Editor"
+        modalWin.titleVisibility = .hidden
+        modalWin.titlebarAppearsTransparent = true
+        modalWin.isMovableByWindowBackground = true
+        modalWin.backgroundColor = NSColor.windowBackgroundColor
+        modalWin.center()
+        
+        let modalContent = NSView(frame: NSRect(x: 0, y: 0, width: winWidth, height: winHeight))
+        
+        // Header
+        let headerView = SettingsHeaderView(frame: NSRect(x: 0, y: winHeight - 90, width: winWidth, height: 90))
+        let iconView = NSImageView(frame: NSRect(x: (winWidth - 64) / 2.0, y: 13, width: 64, height: 64))
+        let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "png") ?? "/Applications/JobsMonitor.app/Contents/Resources/AppIcon.png"
+        if let img = NSImage(contentsOfFile: iconPath) {
+            iconView.image = img
+        } else {
+            iconView.image = NSImage(systemSymbolName: "magnifyingglass.circle.fill", accessibilityDescription: nil)
+        }
+        headerView.addSubview(iconView)
+        
+        let headerSep = NSBox(frame: NSRect(x: 0, y: 0, width: winWidth, height: 1))
+        headerSep.boxType = .separator
+        headerView.addSubview(headerSep)
+        modalContent.addSubview(headerView)
+        
+        // Title & Description Labels
+        let modalTitleLabel = NSTextField(labelWithString: "Edit Custom Search URL")
+        modalTitleLabel.font = NSFont.systemFont(ofSize: 14, weight: .bold)
+        modalTitleLabel.alignment = .center
+        modalTitleLabel.frame = NSRect(x: 20, y: winHeight - 122, width: winWidth - 40, height: 22)
+        modalContent.addSubview(modalTitleLabel)
+        
+        let descLabel = NSTextField(labelWithString: "View, edit, or paste your complete search URL from jobs.apple.com below:")
+        descLabel.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        descLabel.textColor = .secondaryLabelColor
+        descLabel.alignment = .center
+        descLabel.frame = NSRect(x: 20, y: winHeight - 144, width: winWidth - 40, height: 18)
+        modalContent.addSubview(descLabel)
+        
+        // Card Container with Scrollable Editable Text View
+        let cardY: CGFloat = 68
+        let cardH: CGFloat = 195
+        let card = createCardView(frame: NSRect(x: 24, y: cardY, width: winWidth - 48, height: cardH))
+        
+        let scrollView = NSScrollView(frame: NSRect(x: 10, y: 38, width: winWidth - 68, height: cardH - 48))
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        
+        let textView = NSTextView(frame: scrollView.contentView.bounds)
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.drawsBackground = false
+        textView.font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        textView.textColor = .labelColor
+        textView.string = initialText
+        textView.textContainer?.containerSize = NSSize(width: winWidth - 68, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        scrollView.documentView = textView
+        card.addSubview(scrollView)
+        
+        // Helper Toolbar inside card bottom
+        let helperSep = NSBox(frame: NSRect(x: 0, y: 32, width: winWidth - 48, height: 1))
+        helperSep.boxType = .separator
+        card.addSubview(helperSep)
+        
+        let pasteBtn = NSButton(title: "Paste", target: self, action: #selector(pasteClipboardToTextView(_:)))
+        pasteBtn.bezelStyle = .inline
+        pasteBtn.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        pasteBtn.frame = NSRect(x: 10, y: 5, width: 60, height: 22)
+        card.addSubview(pasteBtn)
+        
+        let clearBtn = NSButton(title: "Clear", target: self, action: #selector(clearTextViewAction(_:)))
+        clearBtn.bezelStyle = .inline
+        clearBtn.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        clearBtn.frame = NSRect(x: 78, y: 5, width: 55, height: 22)
+        card.addSubview(clearBtn)
+        
+        let defaultBtn = NSButton(title: "Reset Default", target: self, action: #selector(resetDefaultTextViewAction(_:)))
+        defaultBtn.bezelStyle = .inline
+        defaultBtn.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        defaultBtn.frame = NSRect(x: 140, y: 5, width: 95, height: 22)
+        card.addSubview(defaultBtn)
+        
+        let openBrowserBtn = NSButton(title: "Test in Browser ↗", target: self, action: #selector(openBrowserFromTextViewAction(_:)))
+        openBrowserBtn.bezelStyle = .inline
+        openBrowserBtn.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        openBrowserBtn.frame = NSRect(x: winWidth - 48 - 132, y: 5, width: 122, height: 22)
+        card.addSubview(openBrowserBtn)
+        
+        modalContent.addSubview(card)
+        
+        // Bottom Action Buttons: Cancel and Save
+        let cancelBtn = NSButton(title: "Cancel", target: self, action: #selector(closeInfoModal(_:)))
+        cancelBtn.bezelStyle = .rounded
+        cancelBtn.controlSize = .regular
+        cancelBtn.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        cancelBtn.frame = NSRect(x: winWidth - 196, y: 14, width: 84, height: 32)
+        cancelBtn.keyEquivalent = "\u{1b}" // Esc key
+        modalContent.addSubview(cancelBtn)
+        
+        let saveBtn = NSButton(title: "Save URL", target: self, action: #selector(saveCustomUrlModalAction(_:)))
+        saveBtn.bezelStyle = .rounded
+        saveBtn.controlSize = .regular
+        saveBtn.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        saveBtn.frame = NSRect(x: winWidth - 108, y: 14, width: 92, height: 32)
+        saveBtn.keyEquivalent = "\r"
+        modalContent.addSubview(saveBtn)
+        
+        self.activeModalTextView = textView
+        
+        modalWin.contentView = modalContent
+        NSApp.runModal(for: modalWin)
+    }
+    
+    @objc func pasteClipboardToTextView(_ sender: NSButton) {
+        if let str = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines), !str.isEmpty {
+            activeModalTextView?.string = str
+        }
+    }
+    
+    @objc func clearTextViewAction(_ sender: NSButton) {
+        activeModalTextView?.string = ""
+    }
+    
+    @objc func resetDefaultTextViewAction(_ sender: NSButton) {
+        activeModalTextView?.string = "https://jobs.apple.com/en-us/search?location=india-INDC&sort=newest"
+    }
+    
+    @objc func openBrowserFromTextViewAction(_ sender: NSButton) {
+        let urlStr = activeModalTextView?.string.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if let url = URL(string: urlStr.isEmpty ? "https://jobs.apple.com/en-us/search" : urlStr) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+    
+    @objc func saveCustomUrlModalAction(_ sender: NSButton) {
+        let newUrl = activeModalTextView?.string.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        customUrlField.stringValue = newUrl
+        customUrlField.toolTip = newUrl.isEmpty ? "Paste a search URL from jobs.apple.com" : newUrl
+        
+        // Auto-select Custom URL radio mode when saved
+        if !newUrl.isEmpty {
+            radioCustom.state = .on
+            radioCountry.state = .off
+            radioCity.state = .off
+            countryPopUp.isEnabled = false
+            cityPopUp.isEnabled = false
+            customUrlField.isEnabled = true
+        }
+        
+        var s = loadSettings()
+        s.customUrl = newUrl
+        if radioCustom.state == .on {
+            s.locationMode = 2
+        }
+        saveSettings(s)
+        
+        NSApp.stopModal()
+        sender.window?.orderOut(nil)
     }
 
     @objc func showCustomUrlInstructions() {

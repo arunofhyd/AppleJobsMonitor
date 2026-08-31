@@ -1,7 +1,16 @@
 {
-  "version": "2.3.1",
+  "version": "2.3.2",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.3.2",
+      "date": "2026-08-31",
+      "changes": [
+        "Interactive Custom Search URL Editor: Clicking the search (🔍) button in Preferences now opens a multi-line, scrollable editor supporting direct URL editing, clipboard paste, default reset, and browser testing.",
+        "Light Mode Sign-In Visibility: Replaced static views with dynamic frosted NSVisualEffectView and high-contrast label colors in AppleConnect sign-in window.",
+        "Normalized Button Proportions: Standardized Confirm Sign In and Save URL buttons to native macOS rounded bezel proportions with crisp white contrast."
+      ]
+    },
     {
       "version": "2.3.1",
       "date": "2026-08-26",
