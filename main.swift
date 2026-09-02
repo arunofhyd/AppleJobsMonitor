@@ -1461,7 +1461,18 @@ func normalizeJob(_ raw: [String: Any], defaultUrl: String, isInternal: Bool = f
                 else if !country.isEmpty { locStr = country }
             }
         }
+    } else if let loc = raw["location"] as? String, !loc.isEmpty {
+        locStr = loc
+        extractedCities.append(loc)
     }
+    
+    if let countries = raw["countries"] as? [String] {
+        extractedCountries.append(contentsOf: countries)
+    }
+    if let cities = raw["cities"] as? [String] {
+        extractedCities.append(contentsOf: cities)
+    }
+    
     if locStr.isEmpty { locStr = "Apple" }
     
     let posted = (raw["postingDate"] as? String) ?? (raw["datePosted"] as? String) ?? ""
@@ -1921,15 +1932,18 @@ class AppleConnectAuthWindowController: NSWindowController, WKNavigationDelegate
     }
 }
 
-// ── AppleConnect Silent Background Authentication Engine ────────────────────────
+// ── AppleConnect Silent Background Authentication & Internal Role Fetcher ─────────
 class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
     static let shared = AppleConnectSilentAuthEngine()
     
     private var hostWindow: NSWindow?
     private var webView: WKWebView?
-    private var completionHandler: ((Bool) -> Void)?
+    private var roleCompletionHandler: (([JobItem], Bool) -> Void)?
     private var timeoutTimer: Timer?
-    private var isAuthenticating = false
+    private var isBusy = false
+    private var currentSettings: AppSettings?
+    private var currentBaseUrl: String = ""
+    private var hasExtracted = false
     
     override init() {
         super.init()
@@ -1943,39 +1957,56 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
             return
         }
         
-        if isAuthenticating {
-            logMessage("Silent AppleConnect auth already in progress, chaining completion callback.")
-            let existing = completionHandler
-            completionHandler = { success in
-                existing?(success)
-                completion(success)
+        let settings = loadSettings()
+        let urlStr = targetUrl ?? settings.activeCareersUrl
+        
+        fetchInternalRoles(baseUrl: urlStr, settings: settings, timeout: timeout) { _, success in
+            completion(success)
+        }
+    }
+    
+    func fetchInternalRoles(baseUrl: String, settings: AppSettings, timeout: TimeInterval = 25.0, completion: @escaping ([JobItem], Bool) -> Void) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async {
+                self.fetchInternalRoles(baseUrl: baseUrl, settings: settings, timeout: timeout, completion: completion)
             }
             return
         }
         
-        isAuthenticating = true
-        completionHandler = completion
-        
-        let settings = loadSettings()
-        let urlStr = targetUrl ?? settings.activeCareersUrl
-        guard let url = URL(string: urlStr) else {
-            finish(success: false)
+        if isBusy {
+            logMessage("Silent AppleConnect fetcher already in progress, chaining completion callback.")
+            let existing = roleCompletionHandler
+            roleCompletionHandler = { jobs, success in
+                existing?(jobs, success)
+                completion(jobs, success)
+            }
             return
         }
         
-        logMessage("Initiating silent AppleConnect background SSO re-authentication via \(url.host ?? "careers.apple.com")...")
+        isBusy = true
+        roleCompletionHandler = completion
+        currentSettings = settings
+        currentBaseUrl = baseUrl
+        hasExtracted = false
+        
+        guard let url = URL(string: baseUrl) else {
+            finish(jobs: [], success: false)
+            return
+        }
+        
+        logMessage("Initiating silent AppleConnect internal role fetch via \(url.host ?? "careers.apple.com")...")
         
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore.default()
         
-        let win = NSWindow(contentRect: NSRect(x: -2000, y: -2000, width: 400, height: 400),
+        let win = NSWindow(contentRect: NSRect(x: -2000, y: -2000, width: 800, height: 800),
                            styleMask: [.borderless],
                            backing: .buffered,
                            defer: false)
         win.isReleasedWhenClosed = false
         self.hostWindow = win
         
-        let wv = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 400), configuration: config)
+        let wv = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 800), configuration: config)
         wv.navigationDelegate = self
         wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"
         win.contentView?.addSubview(wv)
@@ -1984,8 +2015,8 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         
         timeoutTimer?.invalidate()
         timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) { [weak self] _ in
-            logMessage("⚠️ Silent AppleConnect SSO timeout reached after \(timeout)s.")
-            self?.finish(success: false)
+            logMessage("⚠️ Silent AppleConnect fetcher timeout reached after \(timeout)s.")
+            self?.finish(jobs: [], success: false)
         }
         
         var request = URLRequest(url: url)
@@ -2035,23 +2066,118 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
                 
                 DispatchQueue.main.async {
                     if hasRealSSOToken || isFullyLoadedOnCareers {
-                        logMessage("✔ Silent AppleConnect SSO re-authentication succeeded! Fresh session cookies captured.")
                         persistAppleCookies(appleCookies)
                         var state = loadStateData()
                         state.isAppleConnectAuthenticated = true
                         state.hasEverAuthenticatedInternal = true
                         state.ssoSessionExpired = false
                         saveStateData(state)
-                        self.finish(success: true)
+                        
+                        // Wait 2.5s for dynamic React DOM job cards to mount
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                            guard let self = self, !self.hasExtracted else { return }
+                            self.extractAndFinish()
+                        }
                     } else {
                         logMessage("⚠️ Silent AppleConnect loaded page but no SSO session tokens detected.")
-                        self.finish(success: false)
+                        self.finish(jobs: [], success: false)
                     }
                 }
             }
         } else if isAuthOrLoginPage && !lowerUrl.contains("ssotokenverify") {
             logMessage("⚠️ Silent AppleConnect SSO stopped at login page (interactive 2FA/credentials required).")
-            self.finish(success: false)
+            var state = loadStateData()
+            state.ssoSessionExpired = true
+            saveStateData(state)
+            self.finish(jobs: [], success: false)
+        }
+    }
+    
+    private func extractAndFinish() {
+        guard let wv = webView, let settings = currentSettings else {
+            finish(jobs: [], success: false)
+            return
+        }
+        hasExtracted = true
+        
+        let js = """
+        (function() {
+            var results = [];
+            var seenPids = {};
+            var links = document.querySelectorAll("a[href*='/details/'], a[href*='/en-us/details/']");
+            links.forEach(function(a) {
+                var href = a.href || "";
+                var pidMatch = href.match(/\\/details\\/([0-9]+)/);
+                var pid = pidMatch ? pidMatch[1] : "";
+                if (!pid || seenPids[pid]) return;
+                seenPids[pid] = true;
+                
+                var card = a.closest("li") || a.closest("div[class*='job']") || a.parentElement;
+                var cardText = card ? card.innerText : "";
+                var lines = cardText.split('\\n').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                
+                var title = a.innerText.trim() || (lines.length > 0 ? lines[0] : "");
+                var team = "";
+                var posted = "";
+                var location = "";
+                
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+                    if (line.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+[0-9]{1,2},\\s+[0-9]{4}/i)) {
+                        posted = line;
+                        if (i > 0 && !team) team = lines[i-1];
+                    }
+                    if (line.startsWith("Location")) {
+                        location = line.replace(/^Location\\s*/i, "").trim();
+                    }
+                }
+                if (!location && lines.length >= 3) {
+                    location = lines[lines.length - 1];
+                }
+                
+                results.push({
+                    "id": pid,
+                    "positionId": pid,
+                    "postingTitle": title,
+                    "title": title,
+                    "team": team,
+                    "location": location,
+                    "postingDate": posted,
+                    "datePosted": posted,
+                    "isInternal": true,
+                    "url": href
+                });
+            });
+            return results;
+        })()
+        """
+        
+        wv.evaluateJavaScript(js) { [weak self] res, err in
+            guard let self = self else { return }
+            var parsedJobs: [JobItem] = []
+            if let rawList = res as? [[String: Any]], !rawList.isEmpty {
+                for r in rawList {
+                    if let item = normalizeJob(r, defaultUrl: self.currentBaseUrl, isInternal: true) {
+                        parsedJobs.append(item)
+                    }
+                }
+            }
+            
+            // Also check if static router hydration data exists in outerHTML as fallback/supplement
+            wv.evaluateJavaScript("document.documentElement.outerHTML") { [weak self] htmlRes, _ in
+                guard let self = self else { return }
+                if let html = htmlRes as? String {
+                    let htmlJobs = parseJobsFromHTML(html, defaultSearchUrl: self.currentBaseUrl, settings: settings, isInternal: true)
+                    for hj in htmlJobs {
+                        if !parsedJobs.contains(where: { $0.id == hj.id }) {
+                            parsedJobs.append(hj)
+                        }
+                    }
+                }
+                
+                logMessage("✔ Silent AppleConnect WebKit extracted \(parsedJobs.count) fresh internal roles.")
+                self.finish(jobs: parsedJobs, success: true)
+            }
         }
     }
     
@@ -2064,7 +2190,7 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
             return
         }
         logMessage("Silent AppleConnect navigation failed: \(error.localizedDescription)")
-        finish(success: false)
+        finish(jobs: [], success: false)
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -2076,10 +2202,10 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
             return
         }
         logMessage("Silent AppleConnect provisional navigation failed (internal network unreachable): \(error.localizedDescription)")
-        finish(success: false)
+        finish(jobs: [], success: false)
     }
     
-    private func finish(success: Bool) {
+    private func finish(jobs: [JobItem], success: Bool) {
         timeoutTimer?.invalidate()
         timeoutTimer = nil
         webView?.stopLoading()
@@ -2088,12 +2214,12 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         webView = nil
         hostWindow?.close()
         hostWindow = nil
-        isAuthenticating = false
+        isBusy = false
         
-        let handler = completionHandler
-        completionHandler = nil
+        let handler = roleCompletionHandler
+        roleCompletionHandler = nil
         DispatchQueue.main.async {
-            handler?(success)
+            handler?(jobs, success)
         }
     }
 }
@@ -3665,105 +3791,46 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         let group = DispatchGroup()
         let lock = NSLock()
         
-        func fetchChannel(baseUrlStr: String, isInternalChannel: Bool, cookies: [HTTPCookie]? = nil) {
-            for page in 1...3 {
-                let sep = baseUrlStr.contains("?") ? "&" : "?"
-                let pageUrlStr = "\(baseUrlStr)\(sep)page=\(page)"
-                guard let url = URL(string: pageUrlStr) else { continue }
-                
-                var request = URLRequest(url: url, timeoutInterval: 30)
-                request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
-                
-                if let cookies = cookies, !cookies.isEmpty {
-                    let headerFields = HTTPCookie.requestHeaderFields(with: cookies)
-                    for (k, v) in headerFields {
-                        request.setValue(v, forHTTPHeaderField: k)
+        // ── 1. ALWAYS fetch Public Jobs concurrently as primary source ──
+        for page in 1...3 {
+            let sep = publicBaseUrl.contains("?") ? "&" : "?"
+            let pageUrlStr = "\(publicBaseUrl)\(sep)page=\(page)"
+            guard let url = URL(string: pageUrlStr) else { continue }
+            
+            var request = URLRequest(url: url, timeoutInterval: 30)
+            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+            
+            group.enter()
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                defer { group.leave() }
+                guard let data = data, error == nil,
+                      let html = String(data: data, encoding: .utf8) else {
+                    if let err = error {
+                        logMessage("Fetch public page \(page) error: \(err.localizedDescription)")
                     }
+                    return
                 }
                 
-                group.enter()
-                URLSession.shared.dataTask(with: request) { data, response, error in
-                    defer { group.leave() }
-                    guard let data = data, error == nil,
-                          let html = String(data: data, encoding: .utf8) else {
-                        if let err = error {
-                            logMessage("Fetch \(isInternalChannel ? "internal" : "public") page \(page) error: \(err.localizedDescription)")
-                        }
-                        return
-                    }
-                    
-                    let pageJobs = parseJobsFromHTML(html, defaultSearchUrl: baseUrlStr, settings: settings, isInternal: isInternalChannel)
-                    
-                    lock.lock()
-                    if isInternalChannel {
-                        internalJobs.append(contentsOf: pageJobs)
-                    } else {
-                        publicJobs.append(contentsOf: pageJobs)
-                    }
-                    lock.unlock()
-                }.resume()
+                let pageJobs = parseJobsFromHTML(html, defaultSearchUrl: publicBaseUrl, settings: settings, isInternal: false)
+                lock.lock()
+                publicJobs.append(contentsOf: pageJobs)
+                lock.unlock()
+            }.resume()
+        }
+        
+        // ── 2. Fetch Internal Jobs via WebKit Engine (handles SAML SSO & dynamic React DOM) ──
+        if internalModeActive {
+            group.enter()
+            AppleConnectSilentAuthEngine.shared.fetchInternalRoles(baseUrl: internalBaseUrl, settings: settings) { fetchedInternal, success in
+                lock.lock()
+                internalJobs.append(contentsOf: fetchedInternal)
+                lock.unlock()
+                group.leave()
             }
         }
         
-        // ── ALWAYS fetch Public Jobs concurrently as guaranteed primary/fallback source ──
-        fetchChannel(baseUrlStr: publicBaseUrl, isInternalChannel: false)
-        
-        if internalModeActive {
-            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
-                var appleCookies = cookies.filter { $0.domain.contains("apple.com") }
-                if appleCookies.isEmpty {
-                    appleCookies = loadPersistedAppleCookies()
-                } else {
-                    persistAppleCookies(appleCookies)
-                }
-                fetchChannel(baseUrlStr: internalBaseUrl, isInternalChannel: true, cookies: appleCookies)
-                
-                group.notify(queue: .main) {
-                    guard let self = self else { return }
-                    if internalJobs.isEmpty && allowSilentRetry {
-                        // Internal fetch returned 0 roles; attempt silent background SSO refresh and retry once
-                        logMessage("Internal roles empty; attempting silent background SSO refresh before finalizing...")
-                        AppleConnectSilentAuthEngine.shared.attemptSilentAuthentication(timeout: 20.0) { [weak self] retrySuccess in
-                            guard let self = self else { return }
-                            if retrySuccess {
-                                let freshCookies = loadPersistedAppleCookies()
-                                let retryGroup = DispatchGroup()
-                                for page in 1...3 {
-                                    let sep = internalBaseUrl.contains("?") ? "&" : "?"
-                                    let pageUrlStr = "\(internalBaseUrl)\(sep)page=\(page)"
-                                    guard let url = URL(string: pageUrlStr) else { continue }
-                                    var req = URLRequest(url: url, timeoutInterval: 30)
-                                    req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
-                                    let fields = HTTPCookie.requestHeaderFields(with: freshCookies)
-                                    for (k, v) in fields { req.setValue(v, forHTTPHeaderField: k) }
-                                    
-                                    retryGroup.enter()
-                                    URLSession.shared.dataTask(with: req) { data, _, _ in
-                                        defer { retryGroup.leave() }
-                                        if let data = data, let html = String(data: data, encoding: .utf8) {
-                                            let pJobs = parseJobsFromHTML(html, defaultSearchUrl: internalBaseUrl, settings: settings, isInternal: true)
-                                            lock.lock()
-                                            internalJobs.append(contentsOf: pJobs)
-                                            lock.unlock()
-                                        }
-                                    }.resume()
-                                }
-                                retryGroup.notify(queue: .main) {
-                                    self.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, internalModeActive: true, settings: settings, isManual: isManual)
-                                }
-                            } else {
-                                self.processFetchedJobs(publicJobs: publicJobs, internalJobs: [], internalModeActive: true, settings: settings, isManual: isManual)
-                            }
-                        }
-                    } else {
-                        self.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, internalModeActive: true, settings: settings, isManual: isManual)
-                    }
-                }
-            }
-        } else {
-            group.notify(queue: .main) { [weak self] in
-                self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: [], internalModeActive: false, settings: settings, isManual: isManual)
-            }
+        group.notify(queue: .main) { [weak self] in
+            self?.processFetchedJobs(publicJobs: publicJobs, internalJobs: internalJobs, internalModeActive: internalModeActive, settings: settings, isManual: isManual)
         }
     }
     
