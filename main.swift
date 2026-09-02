@@ -1944,12 +1944,13 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
     private var currentSettings: AppSettings?
     private var currentBaseUrl: String = ""
     private var hasExtracted = false
+    private var hasRetriedOnce = false
     
     override init() {
         super.init()
     }
     
-    func attemptSilentAuthentication(targetUrl: String? = nil, timeout: TimeInterval = 20.0, completion: @escaping (Bool) -> Void) {
+    func attemptSilentAuthentication(targetUrl: String? = nil, timeout: TimeInterval = 45.0, completion: @escaping (Bool) -> Void) {
         if !Thread.isMainThread {
             DispatchQueue.main.async {
                 self.attemptSilentAuthentication(targetUrl: targetUrl, timeout: timeout, completion: completion)
@@ -1965,7 +1966,7 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         }
     }
     
-    func fetchInternalRoles(baseUrl: String, settings: AppSettings, timeout: TimeInterval = 25.0, completion: @escaping ([JobItem], Bool) -> Void) {
+    func fetchInternalRoles(baseUrl: String, settings: AppSettings, timeout: TimeInterval = 45.0, completion: @escaping ([JobItem], Bool) -> Void) {
         if !Thread.isMainThread {
             DispatchQueue.main.async {
                 self.fetchInternalRoles(baseUrl: baseUrl, settings: settings, timeout: timeout, completion: completion)
@@ -1988,6 +1989,7 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         currentSettings = settings
         currentBaseUrl = baseUrl
         hasExtracted = false
+        hasRetriedOnce = false
         
         guard let url = URL(string: baseUrl) else {
             finish(jobs: [], success: false)
@@ -2201,6 +2203,23 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
             return
         }
+        
+        let isNetworkConnecting = nsError.domain == NSURLErrorDomain &&
+            (nsError.code == NSURLErrorCannotFindHost || nsError.code == NSURLErrorCannotConnectToHost || nsError.code == NSURLErrorNotConnectedToInternet || nsError.code == NSURLErrorNetworkConnectionLost || nsError.code == NSURLErrorTimedOut)
+        
+        if isNetworkConnecting && !hasRetriedOnce && !hasExtracted {
+            hasRetriedOnce = true
+            logMessage("Network/VPN still connecting (\(error.localizedDescription)). Waiting 6s for routes to establish and retrying...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
+                guard let self = self, let wv = self.webView, !self.hasExtracted else { return }
+                guard let url = URL(string: self.currentBaseUrl) else { self.finish(jobs: [], success: false); return }
+                var req = URLRequest(url: url)
+                req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+                wv.load(req)
+            }
+            return
+        }
+        
         logMessage("Silent AppleConnect provisional navigation failed (internal network unreachable): \(error.localizedDescription)")
         finish(jobs: [], success: false)
     }
@@ -3308,8 +3327,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         scheduleTimer()
         scheduleDailyTimer()
         
-        // Initial job check & background update check
-        performCheck(isManual: false)
+        // Initial job check & background update check (delayed 6s to allow Wi-Fi & VPN routes to establish on boot)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
+            self?.performCheck(isManual: false)
+        }
         checkForUpdates(silentIfCurrent: true)
         
         // First Launch or Installer Launch: Automatically open Preferences Window
@@ -3597,9 +3618,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
     
     @objc func macOSDidWake(_ notification: Notification) {
-        logMessage("macOS woke from sleep — restoring cookies and waiting 10s for corporate network/VPN connection before evaluating timers")
+        logMessage("macOS woke from sleep — restoring cookies and waiting 35s for Wi-Fi and corporate network/VPN to establish connection before evaluating timers")
         restorePersistedCookiesToWebKit()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 35.0) { [weak self] in
             self?.evaluateAndScheduleTimer()
             self?.scheduleDailyTimer()
         }
