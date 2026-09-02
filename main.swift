@@ -8,7 +8,7 @@ import WebKit
 // ── Global Single-Source Constants ─────────────────────────────────────────────
 let APP_VERSION: String = {
     if let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String, !v.isEmpty { return v }
-    return "2.3.2"
+    return "2.3.3"
 }()
 let CONTACT_EMAIL = "arunthomashyd@gmail.com"
 let GITHUB_REPO_URL = "https://github.com/arunofhyd/JobsMonitor"

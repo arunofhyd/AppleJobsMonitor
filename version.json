@@ -1,7 +1,16 @@
 {
-  "version": "2.3.2",
+  "version": "2.3.3",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.3.3",
+      "date": "2026-09-02",
+      "changes": [
+        "Live AppleConnect Internal Role Extraction: Upgraded background engine to evaluate the live SAML SSO handshake and extract fresh React DOM job cards from careers.apple.com, ensuring internal listings always reflect the latest positions.",
+        "Extended VPN & Network Reconnection Timing: Increased macOS wake grace period to 35 seconds and background fetch timeout to 45 seconds to ensure Wi-Fi and corporate VPN tunnels establish routing before evaluating job checks.",
+        "Automatic Transient Network Retry: Added 6-second automatic route recovery for background fetches when corporate VPN tunnels are still negotiating DNS."
+      ]
+    },
     {
       "version": "2.3.2",
       "date": "2026-08-31",
