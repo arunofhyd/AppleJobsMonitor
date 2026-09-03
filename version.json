@@ -1,7 +1,14 @@
 {
-  "version": "2.3.3",
+  "version": "2.3.4",
   "downloadURL": "https://raw.githubusercontent.com/arunofhyd/JobsMonitor/refs/heads/main/install-jobsmonitor.command",
   "changelog": [
+    {
+      "version": "2.3.4",
+      "date": "2026-09-03",
+      "changes": [
+        "Multi-Page Internal Role Aggregation: Headless AppleConnect engine now automatically fetches across Page 1 and Page 2 on careers.apple.com, doubling internal tracked role capacity from 19 up to 38+ roles to match the top-40 public quota."
+      ]
+    },
     {
       "version": "2.3.3",
       "date": "2026-09-02",
