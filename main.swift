@@ -1945,6 +1945,8 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
     private var currentBaseUrl: String = ""
     private var hasExtracted = false
     private var hasRetriedOnce = false
+    private var currentPage = 1
+    private var accumulatedJobs: [JobItem] = []
     
     override init() {
         super.init()
@@ -1990,6 +1992,8 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
         currentBaseUrl = baseUrl
         hasExtracted = false
         hasRetriedOnce = false
+        currentPage = 1
+        accumulatedJobs = []
         
         guard let url = URL(string: baseUrl) else {
             finish(jobs: [], success: false)
@@ -2177,8 +2181,31 @@ class AppleConnectSilentAuthEngine: NSObject, WKNavigationDelegate {
                     }
                 }
                 
-                logMessage("✔ Silent AppleConnect WebKit extracted \(parsedJobs.count) fresh internal roles.")
-                self.finish(jobs: parsedJobs, success: true)
+                for pj in parsedJobs {
+                    if !self.accumulatedJobs.contains(where: { $0.id == pj.id }) {
+                        self.accumulatedJobs.append(pj)
+                    }
+                }
+                
+                logMessage("Silent AppleConnect WebKit extracted \(parsedJobs.count) internal roles from page \(self.currentPage).")
+                
+                // Multi-page aggregation: fetch page 2 to fill the top-40 internal quota
+                if self.currentPage == 1 && !parsedJobs.isEmpty {
+                    self.currentPage = 2
+                    self.hasExtracted = false
+                    let sep = self.currentBaseUrl.contains("?") ? "&" : "?"
+                    let page2UrlStr = "\(self.currentBaseUrl)\(sep)page=2"
+                    guard let page2Url = URL(string: page2UrlStr) else {
+                        self.finish(jobs: self.accumulatedJobs, success: true)
+                        return
+                    }
+                    var req = URLRequest(url: page2Url)
+                    req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+                    wv.load(req)
+                } else {
+                    logMessage("✔ Silent AppleConnect WebKit completed multi-page fetch: \(self.accumulatedJobs.count) total internal roles.")
+                    self.finish(jobs: self.accumulatedJobs, success: true)
+                }
             }
         }
     }
